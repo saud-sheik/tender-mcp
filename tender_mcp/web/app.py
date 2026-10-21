@@ -281,12 +281,28 @@ def list_page(
     }
     export_query = urlencode(export_params)
 
+    # Compute status counts for KPI stat cards
+    all_tenders_for_counts = query_filtered_tenders(tier="all", min_hours=None)
+    status_counts = {
+        "all": len(all_tenders_for_counts),
+        "new": 0,
+        "interested": 0,
+        "bidding": 0,
+        "submitted": 0,
+        "skipped": 0,
+    }
+    for t in all_tenders_for_counts:
+        st = t.get("status")
+        if st in status_counts and st != "all":
+            status_counts[st] += 1
+
     rendered = template.render(
         tenders=tenders,
         total_count=len(tenders),
         health=health,
         filters=export_params,
         export_query=export_query,
+        status_counts=status_counts,
     )
     return HTMLResponse(rendered)
 
