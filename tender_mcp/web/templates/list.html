@@ -4,159 +4,438 @@
 
 {% block content %}
 <style>
-  .filters-card {
+  /* KPI Stats Row */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 900px) {
+    .kpi-row {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+  @media (max-width: 500px) {
+    .kpi-row {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .kpi-card {
     background: var(--card-bg);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 24px;
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transition: all 0.15s ease;
+    box-shadow: var(--shadow-sm);
   }
-  .filters-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 12px;
-    align-items: end;
+  .kpi-card:hover {
+    border-color: var(--primary);
+    text-decoration: none;
   }
-  .filter-group {
+  .kpi-card.active {
+    border-color: var(--primary);
+    background: var(--primary-tint);
+    box-shadow: 0 0 0 1px var(--primary);
+  }
+  .kpi-num {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.1;
+  }
+  .kpi-label {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .kpi-card.active .kpi-num {
+    color: var(--primary);
+  }
+
+  /* Compact Filter Bar */
+  .filter-bar-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-sm);
+  }
+  .filter-form-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px 14px;
+  }
+  .filter-item {
     display: flex;
     flex-direction: column;
     gap: 4px;
   }
-  .filter-group label {
-    font-size: 0.8rem;
+  .filter-item label {
+    font-size: 0.72rem;
     font-weight: 600;
     color: var(--text-muted);
+    letter-spacing: 0.02em;
   }
-  .table-card {
+  .filter-item input[type="text"],
+  .filter-item select {
+    height: 34px;
+    padding: 4px 10px;
+    font-size: 0.82rem;
+  }
+  .filter-q {
+    min-width: 200px;
+    flex: 1 1 200px;
+  }
+
+  /* Segmented Kind Control */
+  .seg-control {
+    display: inline-flex;
+    background: var(--border-subtle);
+    padding: 3px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    gap: 2px;
+    height: 34px;
+    align-items: center;
+  }
+  .seg-label {
+    cursor: pointer;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-muted);
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .seg-label.active {
+    background: var(--primary);
+    color: #ffffff;
+  }
+
+  .checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+  }
+  .checkbox-group label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text);
+    cursor: pointer;
+    margin-bottom: 0;
+  }
+
+  .filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  /* Section Header */
+  .list-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 14px;
+  }
+  .list-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .list-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  /* Master-Detail Layout */
+  .master-detail-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 1000px) {
+    .master-detail-grid {
+      grid-template-columns: 1fr;
+    }
+    .detail-pane-wrapper {
+      display: none !important;
+    }
+  }
+
+  /* Left Pane: Tender Card Rows */
+  .tenders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .tender-card-item {
     background: var(--card-bg);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow-x: auto;
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.15s ease;
+    cursor: pointer;
+    position: relative;
+    border-left: 4px solid transparent;
   }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.88rem;
-    text-align: left;
+  .tender-card-item:hover {
+    border-color: var(--primary);
+    transform: translateY(-1px);
   }
-  th {
-    background: #111827;
-    padding: 12px 16px;
-    font-weight: 600;
-    color: var(--text-muted);
-    border-bottom: 1px solid var(--border);
-    white-space: nowrap;
+  .tender-card-item.selected {
+    border-color: var(--primary);
+    border-left: 4px solid var(--primary);
+    background: var(--primary-tint);
   }
-  td {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border);
-    vertical-align: top;
+
+  /* Circular Score Ring */
+  .score-ring {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 2px solid var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--primary);
+    flex-shrink: 0;
+    background: var(--card-bg);
   }
-  tr:hover td {
-    background: rgba(255, 255, 255, 0.02);
+
+  .tender-main {
+    flex: 1 1 auto;
+    min-width: 0;
   }
   .tender-title {
+    font-size: 0.92rem;
     font-weight: 600;
-    color: #fff;
-    font-size: 0.95rem;
+    color: var(--text);
+    text-decoration: none;
+    line-height: 1.35;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-  .tender-org {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-top: 4px;
+  .tender-title:hover {
+    color: var(--primary);
+    text-decoration: underline;
   }
-  .meta-tag {
-    display: inline-block;
+  .tender-org {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tender-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 6px;
+    align-items: center;
+  }
+
+  /* Right Side of Row: Days & EMD */
+  .tender-right {
+    text-align: right;
+    flex-shrink: 0;
+    min-width: 90px;
+  }
+  .days-val {
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .days-val.urgent { color: var(--danger); }
+  .days-val.soon { color: var(--warning); }
+  .days-val.normal { color: var(--success); }
+
+  .deadline-progress-bar {
+    width: 80px;
+    height: 3px;
+    background: var(--border-subtle);
+    border-radius: 2px;
+    margin: 4px 0 4px auto;
+    overflow: hidden;
+  }
+  .deadline-progress-fill {
+    height: 100%;
+    border-radius: 2px;
+  }
+  .deadline-progress-fill.urgent { background: var(--danger); width: 25%; }
+  .deadline-progress-fill.soon { background: var(--warning); width: 55%; }
+  .deadline-progress-fill.normal { background: var(--success); width: 85%; }
+
+  .emd-val {
     font-size: 0.75rem;
-    color: #94a3b8;
-    background: #0f172a;
-    padding: 2px 6px;
-    border-radius: 4px;
-    margin-top: 4px;
+    color: var(--text-muted);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  /* Sticky Right Pane */
+  .detail-pane-wrapper {
+    position: sticky;
+    top: 20px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+  }
+  .detail-pane-placeholder {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  .empty-state-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 48px 24px;
+    text-align: center;
+    color: var(--text-muted);
   }
 </style>
 
-<!-- Filter Form -->
-<div class="filters-card">
-  <form method="get" action="/">
-    <div class="filters-grid">
-      <div class="filter-group" style="grid-column: span 2;">
-        <label for="q">Search (Title, Org, Terms)</label>
-        <input type="text" id="q" name="q" value="{{ filters.q }}" placeholder="e.g. LPG, Valve, Cylinder...">
+<!-- 6 KPI Stat Cards -->
+<div class="kpi-row">
+  {% set current_status = filters.status or 'all' %}
+  {% set base_filter_qs = "tier=" ~ filters.tier ~ "&tender_kind=" ~ filters.tender_kind ~ "&source=" ~ filters.source ~ "&closing_window=" ~ filters.closing_window ~ "&eligibility=" ~ filters.eligibility ~ "&match_basis=" ~ filters.match_basis ~ "&extended_only=" ~ filters.extended_only ~ "&q=" ~ filters.q ~ "&min_hours=" ~ filters.min_hours %}
+
+  <a href="/?status=all&{{ base_filter_qs }}" class="kpi-card {% if current_status == 'all' %}active{% endif %}">
+    <div class="kpi-num">{{ status_counts.all if status_counts is defined else total_count }}</div>
+    <div class="kpi-label">All tenders</div>
+  </a>
+
+  <a href="/?status=new&{{ base_filter_qs }}" class="kpi-card {% if current_status == 'new' %}active{% endif %}">
+    <div class="kpi-num">{{ status_counts.new if status_counts is defined else 0 }}</div>
+    <div class="kpi-label">New</div>
+  </a>
+
+  <a href="/?status=interested&{{ base_filter_qs }}" class="kpi-card {% if current_status == 'interested' %}active{% endif %}">
+    <div class="kpi-num">{{ status_counts.interested if status_counts is defined else 0 }}</div>
+    <div class="kpi-label">Interested</div>
+  </a>
+
+  <a href="/?status=bidding&{{ base_filter_qs }}" class="kpi-card {% if current_status == 'bidding' %}active{% endif %}">
+    <div class="kpi-num">{{ status_counts.bidding if status_counts is defined else 0 }}</div>
+    <div class="kpi-label">Bidding</div>
+  </a>
+
+  <a href="/?status=submitted&{{ base_filter_qs }}" class="kpi-card {% if current_status == 'submitted' %}active{% endif %}">
+    <div class="kpi-num">{{ status_counts.submitted if status_counts is defined else 0 }}</div>
+    <div class="kpi-label">Submitted</div>
+  </a>
+
+  <a href="/?status=skipped&{{ base_filter_qs }}" class="kpi-card {% if current_status == 'skipped' %}active{% endif %}">
+    <div class="kpi-num">{{ status_counts.skipped if status_counts is defined else 0 }}</div>
+    <div class="kpi-label">Skipped</div>
+  </a>
+</div>
+
+<!-- Compact Filter Bar -->
+<div class="filter-bar-card">
+  <form method="get" action="/" id="filter-form">
+    <input type="hidden" name="status" value="{{ filters.status or 'all' }}">
+    <div class="filter-form-row">
+      <!-- Search -->
+      <div class="filter-item filter-q">
+        <label for="q">Search</label>
+        <input type="text" id="q" name="q" value="{{ filters.q }}" placeholder="Title, organisation, term">
       </div>
 
-      <div class="filter-group">
+      <!-- Tier -->
+      <div class="filter-item">
         <label for="tier">Tier</label>
         <select id="tier" name="tier">
           <option value="all" {% if filters.tier == 'all' %}selected{% endif %}>All Tiers</option>
-          <option value="A" {% if filters.tier == 'A' %}selected{% endif %}>Tier A (Score ≥ 70)</option>
-          <option value="B" {% if filters.tier == 'B' %}selected{% endif %}>Tier B (Score 40-69)</option>
-          <option value="C" {% if filters.tier == 'C' %}selected{% endif %}>Tier C (Score < 40)</option>
+          <option value="A" {% if filters.tier == 'A' %}selected{% endif %}>Tier A (score 70+)</option>
+          <option value="B" {% if filters.tier == 'B' %}selected{% endif %}>Tier B (score 40-69)</option>
+          <option value="C" {% if filters.tier == 'C' %}selected{% endif %}>Tier C (score &lt; 40)</option>
         </select>
       </div>
 
-      <div class="filter-group">
-        <label for="status">Workflow Status</label>
-        <select id="status" name="status">
-          <option value="all" {% if filters.status == 'all' %}selected{% endif %}>All Statuses</option>
-          <option value="new" {% if filters.status == 'new' %}selected{% endif %}>New</option>
-          <option value="interested" {% if filters.status == 'interested' %}selected{% endif %}>Interested</option>
-          <option value="bidding" {% if filters.status == 'bidding' %}selected{% endif %}>Bidding</option>
-          <option value="skipped" {% if filters.status == 'skipped' %}selected{% endif %}>Skipped</option>
-          <option value="submitted" {% if filters.status == 'submitted' %}selected{% endif %}>Submitted</option>
-        </select>
-      </div>
-
-      <div class="filter-group" style="grid-column: span 2;">
-        <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Kind Filter</label>
-        <div style="display: inline-flex; background: #111827; padding: 3px; border-radius: 6px; border: 1px solid var(--border); gap: 4px;">
-          <label style="cursor: pointer; padding: 4px 10px; border-radius: 4px; font-size: 0.82rem; font-weight: 600; margin: 0; background: {% if filters.tender_kind in ['products only', 'products_only', 'products', 'product'] %}#2563eb; color: #ffffff;{% else %}transparent; color: #9ca3af;{% endif %}">
+      <!-- 3-Way Radio Toggle: Kind -->
+      <div class="filter-item">
+        <label>Type</label>
+        <div class="seg-control">
+          <label class="seg-label {% if filters.tender_kind in ['products only', 'products_only', 'products', 'product'] %}active{% endif %}">
             <input type="radio" name="tender_kind" value="products only" onchange="this.form.submit()" style="display: none;" {% if filters.tender_kind in ['products only', 'products_only', 'products', 'product'] %}checked{% endif %}> products only
           </label>
-          <label style="cursor: pointer; padding: 4px 10px; border-radius: 4px; font-size: 0.82rem; font-weight: 600; margin: 0; background: {% if filters.tender_kind in ['services only', 'services_only', 'services', 'service'] %}#2563eb; color: #ffffff;{% else %}transparent; color: #9ca3af;{% endif %}">
+          <label class="seg-label {% if filters.tender_kind in ['services only', 'services_only', 'services', 'service'] %}active{% endif %}">
             <input type="radio" name="tender_kind" value="services only" onchange="this.form.submit()" style="display: none;" {% if filters.tender_kind in ['services only', 'services_only', 'services', 'service'] %}checked{% endif %}> services only
           </label>
-          <label style="cursor: pointer; padding: 4px 10px; border-radius: 4px; font-size: 0.82rem; font-weight: 600; margin: 0; background: {% if filters.tender_kind in ['both', 'all', ''] or not filters.tender_kind %}#2563eb; color: #ffffff;{% else %}transparent; color: #9ca3af;{% endif %}">
+          <label class="seg-label {% if filters.tender_kind in ['both', 'all', ''] or not filters.tender_kind %}active{% endif %}">
             <input type="radio" name="tender_kind" value="both" onchange="this.form.submit()" style="display: none;" {% if filters.tender_kind in ['both', 'all', ''] or not filters.tender_kind %}checked{% endif %}> both
           </label>
         </div>
       </div>
 
-      <div class="filter-group">
+      <!-- Source -->
+      <div class="filter-item">
         <label for="source">Source</label>
         <select id="source" name="source">
-          <option value="all" {% if filters.source == 'all' %}selected{% endif %}>All Sources</option>
+          <option value="all" {% if filters.source == 'all' %}selected{% endif %}>All sources</option>
           <option value="gem" {% if filters.source == 'gem' %}selected{% endif %}>GeM</option>
           <option value="cppp" {% if filters.source == 'cppp' %}selected{% endif %}>CPPP</option>
           <option value="hmel" {% if filters.source == 'hmel' %}selected{% endif %}>HMEL</option>
         </select>
       </div>
 
-      <div class="filter-group">
-        <label for="closing_window">Closing Window</label>
+      <!-- Closing Window -->
+      <div class="filter-item">
+        <label for="closing_window">Closing in</label>
         <select id="closing_window" name="closing_window">
-          <option value="all" {% if filters.closing_window == 'all' %}selected{% endif %}>All Windows</option>
+          <option value="all" {% if filters.closing_window == 'all' %}selected{% endif %}>All windows</option>
           <option value="urgent" {% if filters.closing_window == 'urgent' %}selected{% endif %}>Urgent (≤ 48h)</option>
           <option value="soon" {% if filters.closing_window == 'soon' %}selected{% endif %}>Soon (48h - 7d)</option>
-          <option value="normal" {% if filters.closing_window == 'normal' %}selected{% endif %}>Normal (> 7d)</option>
+          <option value="normal" {% if filters.closing_window == 'normal' %}selected{% endif %}>More than 24 hours</option>
         </select>
       </div>
 
-      <div class="filter-group">
+      <!-- Eligibility -->
+      <div class="filter-item">
         <label for="eligibility">Eligibility</label>
         <select id="eligibility" name="eligibility">
-          <option value="all" {% if filters.eligibility == 'all' %}selected{% endif %}>All Eligibilities</option>
-          <option value="no_blockers_found" {% if filters.eligibility == 'no_blockers_found' %}selected{% endif %}>No Blockers Found</option>
-          <option value="likely_not_eligible" {% if filters.eligibility == 'likely_not_eligible' %}selected{% endif %}>Likely Not Eligible</option>
+          <option value="all" {% if filters.eligibility == 'all' %}selected{% endif %}>All eligibilities</option>
+          <option value="no_blockers_found" {% if filters.eligibility == 'no_blockers_found' %}selected{% endif %}>No blockers found</option>
+          <option value="likely_not_eligible" {% if filters.eligibility == 'likely_not_eligible' %}selected{% endif %}>Likely not eligible</option>
           <option value="unknown" {% if filters.eligibility == 'unknown' %}selected{% endif %}>Unknown</option>
         </select>
       </div>
 
-      <div class="filter-group">
+      <!-- Match Basis -->
+      <div class="filter-item">
         <label for="match_basis">Match Basis</label>
         <select id="match_basis" name="match_basis">
           <option value="all" {% if filters.match_basis == 'all' %}selected{% endif %}>All</option>
@@ -165,167 +444,259 @@
         </select>
       </div>
 
-      <div class="filter-group" style="display: flex; flex-direction: row; align-items: center; gap: 8px; padding-bottom: 8px;">
-        <input type="checkbox" id="extended_only" name="extended_only" value="1" {% if filters.extended_only %}checked{% endif %}>
-        <label for="extended_only" style="cursor: pointer;">Extended Only</label>
+      <!-- Client-Side Sort -->
+      <div class="filter-item">
+        <label for="client-sort">Sort</label>
+        <select id="client-sort" onchange="sortTendersList(this.value)">
+          <option value="closing_soonest">Closing soonest</option>
+          <option value="score_desc">Score high→low</option>
+          <option value="emd_asc">EMD low→high</option>
+        </select>
       </div>
 
-      <div style="display: flex; gap: 8px;">
-        <button type="submit">Filter</button>
+      <!-- Extended Only Checkbox -->
+      <div class="filter-item">
+        <label>&nbsp;</label>
+        <div class="checkbox-group">
+          <input type="checkbox" id="extended_only" name="extended_only" value="1" {% if filters.extended_only %}checked{% endif %} onchange="this.form.submit()">
+          <label for="extended_only">Extended only</label>
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div class="filter-actions">
+        <button type="submit" class="btn">Filter</button>
         <a href="/" class="btn btn-secondary">Reset</a>
+        <a href="/export?{{ export_query }}" class="btn">Export CSV</a>
       </div>
     </div>
   </form>
 </div>
 
-<!-- Header Summary & Export -->
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+<!-- Header Summary -->
+<div class="list-header-row">
   <div>
-    <h2>Matching Tenders ({{ total_count }})</h2>
-    <p style="color: var(--text-muted); font-size: 0.85rem;">
-      Default view: Open tenders, Tier A, closing in > 24 hours.
-    </p>
+    <h2 class="list-title">Matching Tenders ({{ total_count }})</h2>
   </div>
   <div>
-    <a href="/export?{{ export_query }}" class="btn btn-secondary">📥 Export CSV</a>
+    <span class="list-subtitle">Default view: Open tenders, Tier A, closing in &gt; 24 hours.</span>
   </div>
 </div>
 
-<!-- Tenders Table -->
-<div class="table-card">
-  <table>
-    <thead>
-      <tr>
-        <th>Tier / Status</th>
-        <th>Tender Details</th>
-        <th>Score / Terms</th>
-        <th>EMD</th>
-        <th>Closing (IST)</th>
-        <th>Hours Left</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in tenders %}
-      <tr>
-        <td>
-          <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
-            <div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">
-              <span class="badge badge-tier-{{ t.tier }}">Tier {{ t.tier }}</span>
-              {% if t.match_basis == 'location_only' %}
-                <span class="badge" style="background: #78350f; color: #fde68a; border: 1px solid #d97706; font-size: 0.72rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;">location only</span>
-              {% endif %}
-              {% if t.buyer_match %}
-                <span class="badge" style="background: #065f46; color: #a7f3d0; border: 1px solid #10b981; font-size: 0.72rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;">Oil/gas buyer, supply tender</span>
-              {% endif %}
-            </div>
-            {% if t.tender_kind == 'product' %}
-              <span class="badge" style="background: #1e3a8a; color: #93c5fd; border: 1px solid #3b82f6; font-size: 0.72rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;">Product</span>
-            {% elif t.tender_kind == 'service' %}
-              <span class="badge" style="background: #4c1d95; color: #d8b4fe; border: 1px solid #8b5cf6; font-size: 0.72rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;">Service</span>
-            {% elif t.tender_kind == 'mixed' %}
-              <span class="badge" style="background: #14532d; color: #86efac; border: 1px solid #22c55e; font-size: 0.72rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;">Mixed</span>
-            {% elif t.tender_kind == 'unknown' %}
-              <span class="badge" style="background: #334155; color: #94a3b8; border: 1px solid #475569; font-size: 0.72rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;">Unknown</span>
-            {% elif t.tender_kind %}
-              <span class="badge" style="background: #374151; color: #d1d5db; border: 1px solid #4b5563; font-size: 0.72rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;">{{ t.tender_kind }}</span>
+<!-- Master-Detail Layout -->
+{% if tenders %}
+<div class="master-detail-grid">
+  <!-- Left Pane: List -->
+  <div class="tenders-list" id="tenders-container">
+    {% for t in tenders %}
+      {% set days_int = ((t.hours_to_close / 24) | round(0) | int) if t.hours_to_close is not none else none %}
+      <div class="tender-card-item"
+           data-id="{{ t.id }}"
+           data-href="/tenders/{{ t.id }}"
+           data-hours="{{ t.hours_to_close if t.hours_to_close is not none else 999999 }}"
+           data-score="{{ t.relevance_score or 0 }}"
+           data-emd="{{ t.emd_amount_inr or t.emd_amount_inr_min or 0 }}"
+           onclick="handleRowClick(event, this)">
+        <!-- Circular Score Ring -->
+        <div class="score-ring">
+          {{ t.relevance_score }}
+        </div>
+
+        <!-- Middle Info -->
+        <div class="tender-main">
+          <a href="/tenders/{{ t.id }}" class="tender-title" onclick="event.stopPropagation()">{{ t.title }}</a>
+          <div class="tender-org">{{ t.organisation }}</div>
+
+          <div class="tender-chips">
+            <span class="badge badge-tier-{{ t.tier }}">Tier {{ t.tier }}</span>
+            <span class="badge" style="background: var(--border-subtle); color: var(--text-muted);">{{ t.source|upper }}</span>
+            {% if t.tender_kind %}
+              <span class="badge" style="background: var(--border-subtle); color: var(--text-muted);">{{ t.tender_kind }}</span>
             {% endif %}
             <span class="badge badge-status-{{ t.status }}">{{ t.status }}</span>
-            {% if t.owner %}
-              <span class="meta-tag">👤 {{ t.owner }}</span>
-            {% else %}
-              <span class="meta-tag" style="opacity: 0.65;">👤 Unassigned</span>
-            {% endif %}
-          </div>
-        </td>
 
-        <td style="max-width: 480px;">
-          <div>
-            <a href="/tenders/{{ t.id }}" class="tender-title">{{ t.title }}</a>
-            <div class="tender-org">{{ t.organisation }}</div>
-          </div>
-          <div style="margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap;">
-            <span class="meta-tag">{{ t.source|upper }}</span>
-            {% if t.tender_kind %}
-              <span class="meta-tag">{{ t.tender_kind }}</span>
+            {% if t.owner %}
+              <span class="badge" style="background: var(--card-subtle); color: var(--text-muted); border-color: var(--border);">👤 {{ t.owner }}</span>
             {% endif %}
+
+            {% if t.match_basis == 'location_only' %}
+              <span class="badge" style="background: #fef3c7; color: #92400e; border-color: #fde68a;">location only</span>
+            {% endif %}
+
             {% if t.buyer_match %}
-              <span class="badge" style="background: #065f46; color: #a7f3d0; border: 1px solid #10b981;">Oil/gas buyer, supply tender</span>
+              <span class="badge" style="background: #e8f5e9; color: #1e7e34; border-color: #c8e6c9;">Oil/gas buyer, supply tender</span>
             {% endif %}
+
             {% if t.is_extended or t.date_check in ['extended_auto', 'extended_by_corrigendum'] %}
               <span class="badge badge-extended">Extended</span>
             {% endif %}
+
             {% if t.details_needed or t.status == 'details needed' %}
               <span class="badge badge-details-needed">Details Needed</span>
             {% endif %}
+
             {% if t.buyer_overrides_gem_fields %}
-              <span class="badge" style="background: #7f1d1d; color: #fca5a5; border: 1px solid #ef4444;" title="EMD / turnover set in buyer documents, check them before relying on these numbers">Buyer overrides EMD/Turnover</span>
+              <span class="badge" style="background: #fee2e2; color: #991b1b; border-color: #fecaca;" title="EMD / turnover set in buyer documents, check them before relying on these numbers">Buyer overrides EMD/Turnover</span>
             {% endif %}
+
             {% if not t.estimated_bid_value_inr and (t.floor_price_inr_min or t.floor_price_inr_max) %}
-              <span class="badge" style="background: #1e293b; color: #94a3b8; border: 1px solid #475569;">Floor price</span>
+              <span class="badge" style="background: var(--card-subtle); color: var(--text-muted); border-color: var(--border);">Floor price</span>
             {% endif %}
+
             {% if t.category_noise_reason %}
-              <span class="badge" style="background: #451a03; color: #fde68a; border: 1px solid #f59e0b;" title="{{ t.category_noise_reason }}">{{ t.category_noise_reason }}</span>
+              <span class="badge" style="background: #fef3c7; color: #92400e; border-color: #fde68a;" title="{{ t.category_noise_reason }}">{{ t.category_noise_reason }}</span>
             {% endif %}
+
             {% if t.eligibility == 'no_blockers_found' %}
-              <span class="badge" style="background: #064e3b; color: #6ee7b7;">Eligible</span>
+              <span class="badge badge-tier-A">Eligible</span>
             {% elif t.eligibility == 'likely_not_eligible' %}
-              <span class="badge" style="background: #7f1d1d; color: #fca5a5;">Ineligible</span>
+              <span class="badge badge-details-needed">Ineligible</span>
             {% endif %}
           </div>
-        </td>
+        </div>
 
-        <td>
-          <div style="font-weight: 700; font-size: 1.1rem; color: #38bdf8;">
-            {{ t.relevance_score }}
-          </div>
-          <div style="font-size: 0.78rem; color: var(--text-muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ t.matched_terms }}">
-            {{ t.matched_terms or 'None' }}
-          </div>
-        </td>
-
-        <td style="white-space: nowrap;">
-          {% if t.emd_amount_inr %}
-            ₹{{ "{:,.0f}".format(t.emd_amount_inr) }}
-          {% elif t.emd_amount_inr_min or t.emd_amount_inr_max %}
-            ₹{{ "{:,.0f}".format(t.emd_amount_inr_min or 0) }} - ₹{{ "{:,.0f}".format(t.emd_amount_inr_max or 0) }}
-          {% elif t.emd_value %}
-            {{ t.emd_value }}
-          {% else %}
-            <span style="color: var(--text-muted);">Nil / Exempt</span>
-          {% endif %}
-        </td>
-
-        <td style="white-space: nowrap;">
-          <strong>{{ t.closing_ist }}</strong>
-          {% if t.date_check == 'extended_by_corrigendum' %}
-            <div style="font-size: 0.75rem; color: #fbbf24;">(via Corrigendum)</div>
-          {% elif t.date_check == 'extended_auto' %}
-            <div style="font-size: 0.75rem; color: #93c5fd;">(Auto-extended)</div>
-          {% endif %}
-        </td>
-
-        <td style="white-space: nowrap;">
+        <!-- Right: Time & EMD -->
+        <div class="tender-right" title="{{ t.hours_to_close if t.hours_to_close is not none else 'N/A' }}h left · Closing: {{ t.closing_ist }}">
           {% if t.hours_to_close is not none %}
             {% if t.hours_to_close <= 48 %}
-              <span style="color: #f87171; font-weight: 700;">{{ t.hours_to_close }}h left</span>
+              <div class="days-val urgent">{{ t.hours_to_close }}h</div>
+              <div class="deadline-progress-bar"><div class="deadline-progress-fill urgent"></div></div>
             {% elif t.hours_to_close <= 168 %}
-              <span style="color: #fbbf24; font-weight: 600;">{{ t.hours_to_close }}h left</span>
+              <div class="days-val soon">{{ days_int }} days</div>
+              <div class="deadline-progress-bar"><div class="deadline-progress-fill soon"></div></div>
             {% else %}
-              <span style="color: #4ade80;">{{ t.hours_to_close }}h left</span>
+              <div class="days-val normal">{{ days_int }} days</div>
+              <div class="deadline-progress-bar"><div class="deadline-progress-fill normal"></div></div>
             {% endif %}
           {% else %}
-            <span style="color: var(--text-muted);">N/A</span>
+            <div class="days-val" style="color: var(--text-dim);">N/A</div>
           {% endif %}
-        </td>
-      </tr>
-      {% else %}
-      <tr>
-        <td colspan="6" style="text-align: center; padding: 32px; color: var(--text-muted);">
-          No matching tenders found. Try adjusting your filters.
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+
+          <div class="emd-val">
+            {% if t.emd_amount_inr %}
+              EMD ₹{{ "{:,.0f}".format(t.emd_amount_inr) }}
+            {% elif t.emd_amount_inr_min or t.emd_amount_inr_max %}
+              EMD ₹{{ "{:,.0f}".format(t.emd_amount_inr_min or 0) }} - ₹{{ "{:,.0f}".format(t.emd_amount_inr_max or 0) }}
+            {% elif t.emd_value %}
+              EMD {{ t.emd_value }}
+            {% else %}
+              EMD Nil / Exempt
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <!-- Right Pane: Detail Preview (Sticky) -->
+  <div class="detail-pane-wrapper">
+    <div id="detail-preview-container">
+      <div class="detail-pane-placeholder">
+        Select a tender from the left to view details.
+      </div>
+    </div>
+  </div>
 </div>
+{% else %}
+<div class="empty-state-card">
+  <h3>No matching tenders found. Try adjusting your filters.</h3>
+</div>
+{% endif %}
+
+<script>
+  function handleRowClick(event, rowEl) {
+    var href = rowEl.getAttribute('data-href');
+    if (!href) return;
+    loadDetailPreview(href, rowEl);
+  }
+
+  function loadDetailPreview(url, rowEl) {
+    var allRows = document.querySelectorAll('.tender-card-item');
+    for (var i = 0; i < allRows.length; i++) {
+      allRows[i].classList.remove('selected');
+    }
+    if (rowEl) {
+      rowEl.classList.add('selected');
+    }
+
+    var container = document.getElementById('detail-preview-container');
+    if (!container) return;
+
+    fetch(url)
+      .then(function(res) {
+        if (!res.ok) throw new Error('Status ' + res.status);
+        return res.text();
+      })
+      .then(function(html) {
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(html, 'text/html');
+        var content = doc.getElementById('tender-detail-content');
+        if (content) {
+          container.replaceChildren(content);
+        } else {
+          var fallback = document.createElement('div');
+          fallback.className = 'detail-pane-placeholder';
+          var p = document.createElement('p');
+          p.textContent = 'Preview unavailable.';
+          var a = document.createElement('a');
+          a.href = url;
+          a.textContent = 'Open full detail page';
+          fallback.appendChild(p);
+          fallback.appendChild(a);
+          container.replaceChildren(fallback);
+        }
+      })
+      .catch(function(err) {
+        var errBox = document.createElement('div');
+        errBox.className = 'detail-pane-placeholder';
+        var p = document.createElement('p');
+        p.textContent = 'Could not load tender preview.';
+        var a = document.createElement('a');
+        a.href = url;
+        a.textContent = 'Open tender page directly';
+        errBox.appendChild(p);
+        errBox.appendChild(a);
+        container.replaceChildren(errBox);
+      });
+  }
+
+  function sortTendersList(mode) {
+    var container = document.getElementById('tenders-container');
+    if (!container) return;
+    var rows = Array.prototype.slice.call(container.querySelectorAll('.tender-card-item'));
+    if (!rows.length) return;
+
+    rows.sort(function(a, b) {
+      if (mode === 'closing_soonest') {
+        var hA = parseFloat(a.getAttribute('data-hours') || '999999');
+        var hB = parseFloat(b.getAttribute('data-hours') || '999999');
+        return hA - hB;
+      } else if (mode === 'score_desc') {
+        var sA = parseFloat(a.getAttribute('data-score') || '0');
+        var sB = parseFloat(b.getAttribute('data-score') || '0');
+        return sB - sA;
+      } else if (mode === 'emd_asc') {
+        var eA = parseFloat(a.getAttribute('data-emd') || '0');
+        var eB = parseFloat(b.getAttribute('data-emd') || '0');
+        return eA - eB;
+      }
+      return 0;
+    });
+
+    for (var i = 0; i < rows.length; i++) {
+      container.appendChild(rows[i]);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    var firstRow = document.querySelector('.tender-card-item');
+    if (firstRow && window.innerWidth >= 1000) {
+      var href = firstRow.getAttribute('data-href');
+      if (href) {
+        loadDetailPreview(href, firstRow);
+      }
+    }
+  });
+</script>
 {% endblock %}
+
