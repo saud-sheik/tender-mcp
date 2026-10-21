@@ -367,3 +367,50 @@ def test_digest_dry_run_never_writes_last_sent(monkeypatch, capsys):
     assert gen_time not in window_line
 
 
+def test_dashboard_redesign_kpis_and_form():
+    """Verify list page contains 6 KPI labels and status counts, and detail page retains form fields."""
+    client = TestClient(app)
+    auth = _get_auth_header()
+
+    seeded = [
+        {"id": "gem:KPI_1", "source": "gem", "title": "Tender 1", "organisation": "IOCL", "category": "Goods", "published_date": "2026-10-01T00:00:00Z", "closing_date": "2026-11-20T10:00:00Z", "relevance_score": 75, "status": "new", "raw": {}},
+        {"id": "gem:KPI_2", "source": "gem", "title": "Tender 2", "organisation": "BPCL", "category": "Goods", "published_date": "2026-10-01T00:00:00Z", "closing_date": "2026-11-20T10:00:00Z", "relevance_score": 80, "status": "new", "raw": {}},
+        {"id": "gem:KPI_3", "source": "gem", "title": "Tender 3", "organisation": "HPCL", "category": "Goods", "published_date": "2026-10-01T00:00:00Z", "closing_date": "2026-11-20T10:00:00Z", "relevance_score": 85, "status": "interested", "raw": {}},
+        {"id": "gem:KPI_4", "source": "gem", "title": "Tender 4", "organisation": "ONGC", "category": "Goods", "published_date": "2026-10-01T00:00:00Z", "closing_date": "2026-11-20T10:00:00Z", "relevance_score": 90, "status": "bidding", "raw": {}},
+        {"id": "gem:KPI_5", "source": "gem", "title": "Tender 5", "organisation": "GAIL", "category": "Goods", "published_date": "2026-10-01T00:00:00Z", "closing_date": "2026-11-20T10:00:00Z", "relevance_score": 70, "status": "submitted", "raw": {}},
+        {"id": "gem:KPI_6", "source": "gem", "title": "Tender 6", "organisation": "OIL", "category": "Goods", "published_date": "2026-10-01T00:00:00Z", "closing_date": "2026-11-20T10:00:00Z", "relevance_score": 72, "status": "skipped", "raw": {}},
+    ]
+    for item in seeded:
+        db_module.upsert_tender(item)
+
+    # 1. Verify list page KPI labels and counts
+    r_list = client.get("/", headers=auth)
+    assert r_list.status_code == 200
+
+    # KPI labels
+    assert "All tenders" in r_list.text
+    assert "New" in r_list.text
+    assert "Interested" in r_list.text
+    assert "Bidding" in r_list.text
+    assert "Submitted" in r_list.text
+    assert "Skipped" in r_list.text
+
+    # Seeded status counts: total 6, new 2, interested 1, bidding 1, submitted 1, skipped 1
+    # Check that KPI numbers appear within their respective card elements
+    assert '<div class="kpi-num">6</div>\n    <div class="kpi-label">All tenders</div>' in r_list.text
+    assert '<div class="kpi-num">2</div>\n    <div class="kpi-label">New</div>' in r_list.text
+    assert '<div class="kpi-num">1</div>\n    <div class="kpi-label">Interested</div>' in r_list.text
+    assert '<div class="kpi-num">1</div>\n    <div class="kpi-label">Bidding</div>' in r_list.text
+    assert '<div class="kpi-num">1</div>\n    <div class="kpi-label">Submitted</div>' in r_list.text
+    assert '<div class="kpi-num">1</div>\n    <div class="kpi-label">Skipped</div>' in r_list.text
+
+    # 2. Verify detail page update form fields
+    r_detail = client.get(f"/tenders/{seeded[0]['id']}", headers=auth)
+    assert r_detail.status_code == 200
+    assert 'name="status"' in r_detail.text
+    assert 'name="owner"' in r_detail.text
+    assert 'name="notes"' in r_detail.text
+    assert "Save Changes" in r_detail.text
+
+
+
