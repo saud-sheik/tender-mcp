@@ -1,0 +1,15 @@
+[Unit]
+Description=Swamina Tender Aggregator Web Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=saud
+WorkingDirectory=/Users/saud/Projects/tender-mcp
+EnvironmentFile=/Users/saud/Projects/tender-mcp/.env
+ExecStart=/usr/local/bin/uvicorn tender_mcp.web.app:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

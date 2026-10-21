@@ -1,0 +1,12 @@
+[Unit]
+Description=Swamina Tender Scraper Refresh Run
+After=network.target
+
+[Service]
+Type=oneshot
+User=saud
+WorkingDirectory=/Users/saud/Projects/tender-mcp
+EnvironmentFile=/Users/saud/Projects/tender-mcp/.env
+ExecStart=/usr/local/bin/python3 -m scripts.refresh
+StandardOutput=append:/Users/saud/Projects/tender-mcp/refresh.log
+StandardError=append:/Users/saud/Projects/tender-mcp/refresh.log

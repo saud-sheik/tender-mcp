@@ -1,0 +1,11 @@
+[Unit]
+Description=Swamina Tender Database Nightly Backup
+After=network.target
+
+[Service]
+Type=oneshot
+User=saud
+WorkingDirectory=/Users/saud/Projects/tender-mcp
+ExecStart=/usr/local/bin/python3 scripts/backup_db.py --keep 14
+StandardOutput=append:/Users/saud/Projects/tender-mcp/refresh.log
+StandardError=append:/Users/saud/Projects/tender-mcp/refresh.log

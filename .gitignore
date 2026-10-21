@@ -1,0 +1,50 @@
+# Environment & credentials
+.env
+.env.local
+!.env.example
+.hmel_locked
+
+# Database
+tenders.db
+*.db
+*.db-wal
+*.db-shm
+
+# Playwright state
+playwright_state.json
+playwright-state/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+.pytest_cache/
+.mypy_cache/
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Exports
+exports/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+refresh.log
+*.log
+
+# Runtime artefacts
+cache/
+scratch/
+debug/
+backups/

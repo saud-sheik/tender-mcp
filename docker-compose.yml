@@ -1,0 +1,41 @@
+version: "3.8"
+
+services:
+  dashboard:
+    build: .
+    container_name: tender_dashboard
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./tenders.db:/app/tenders.db
+      - ./cache:/app/cache
+      - ./backups:/app/backups
+      - ./.env:/app/.env:ro
+      - ./refresh.log:/app/refresh.log
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: ["uvicorn", "tender_mcp.web.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  scheduler:
+    build: .
+    container_name: tender_scheduler
+    restart: unless-stopped
+    volumes:
+      - ./tenders.db:/app/tenders.db
+      - ./cache:/app/cache
+      - ./backups:/app/backups
+      - ./.env:/app/.env
+      - ./refresh.log:/app/refresh.log
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: >
+      bash -c '
+        echo "0 */3 * * * cd /app && python3 -m scripts.refresh >> /app/refresh.log 2>&1" > /etc/cron.d/tender_cron &&
+        echo "30 2 * * * cd /app && if [ "\$DIGEST_ENABLED" = "true" ]; then python3 scripts/send_digest.py --send >> /app/refresh.log 2>&1; else python3 scripts/send_digest.py --dry-run >> /app/refresh.log 2>&1; fi" >> /etc/cron.d/tender_cron &&
+        echo "0 21 * * * cd /app && python3 scripts/backup_db.py >> /app/refresh.log 2>&1" >> /etc/cron.d/tender_cron &&
+        chmod 0644 /etc/cron.d/tender_cron &&
+        crontab /etc/cron.d/tender_cron &&
+        echo "Scheduler cron jobs registered. Starting cron daemon in foreground..." &&
+        cron -f
+      '

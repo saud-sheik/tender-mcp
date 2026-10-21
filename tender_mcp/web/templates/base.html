@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Swamina Tender Aggregator{% endblock %}</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --badge-bg: #334155;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding-bottom: 60px;
+    }
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    
+    /* Top Warning Banner */
+    .banner {
+      background: #7c2d12;
+      color: #ffedd5;
+      text-align: center;
+      padding: 10px 16px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border-bottom: 2px solid #ea580c;
+    }
+
+    /* Health Strip */
+    .health-strip {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 24px;
+      font-size: 0.85rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .health-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .health-ok { background: #064e3b; color: #6ee7b7; }
+    .health-stale { background: #7f1d1d; color: #fca5a5; }
+
+    /* Header Nav */
+    header {
+      background: #111827;
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .logo span { color: var(--primary); }
+    .nav-links { display: flex; gap: 16px; align-items: center; font-size: 0.9rem; }
+
+    /* Container */
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge-tier-A { background: #065f46; color: #6ee7b7; }
+    .badge-tier-B { background: #1e40af; color: #93c5fd; }
+    .badge-tier-C { background: #374151; color: #9ca3af; }
+    .badge-extended { background: #854d0e; color: #fef08a; }
+    .badge-details-needed { background: #991b1b; color: #fecaca; }
+    .badge-status-new { background: #1e3a8a; color: #bfdbfe; }
+    .badge-status-interested { background: #065f46; color: #a7f3d0; }
+    .badge-status-bidding { background: #581c87; color: #e9d5ff; }
+    .badge-status-skipped { background: #374151; color: #9ca3af; }
+    .badge-status-submitted { background: #14532d; color: #bbf7d0; }
+
+    /* Form Controls */
+    select, input[type="text"], textarea {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+    select:focus, input[type="text"]:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    button, .btn {
+      display: inline-block;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    button:hover, .btn:hover {
+      background: var(--primary-hover);
+      text-decoration: none;
+    }
+    .btn-secondary {
+      background: #475569;
+    }
+    .btn-secondary:hover {
+      background: #334155;
+    }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <!-- Global Warning Banner -->
+  <div class="banner">
+    ⚠️ Deadlines can be extended. Confirm the live deadline on GeM before bidding.
+  </div>
+
+  <!-- Health Strip -->
+  <div class="health-strip">
+    <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+      <div>
+        <strong>Refresh Health:</strong>
+        {% if health.is_stale %}
+          <span class="health-badge health-stale">⚠️ STALE ({{ health.age_hours }}h ago)</span>
+        {% else %}
+          <span class="health-badge health-ok">✓ OK ({{ health.age_hours }}h ago)</span>
+        {% endif %}
+      </div>
+      <div>
+        <span style="color: var(--text-muted);">Last run:</span> {{ health.last_run_ist }}
+      </div>
+      <div>
+        <span style="color: var(--text-muted);">Recent counts:</span>
+        CPPP: {{ health.sources.cppp.new }} new / {{ health.sources.cppp.fetched }} fetched
+        | GeM: {{ health.sources.gem.new }} new / {{ health.sources.gem.fetched }} fetched
+        | HMEL: {{ health.sources.hmel.new }} new / {{ health.sources.hmel.fetched }} fetched
+      </div>
+    </div>
+    <div>
+      <a href="/health" style="font-size: 0.8rem; color: var(--text-muted);">JSON Status API</a>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <a href="/" style="color: inherit; text-decoration: none;">Swamina <span>Tenders</span></a>
+    </div>
+    <nav class="nav-links">
+      <a href="/">All Tenders</a>
+      <a href="/?tier=A">Tier A Tenders</a>
+      <a href="/?extended_only=1">Extended Bids</a>
+    </nav>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

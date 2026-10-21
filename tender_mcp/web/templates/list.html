@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+
+{% block title %}Tender Listing - Swamina Tender Aggregator{% endblock %}
+
+{% block content %}
+<style>
+  .filters-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+  .filters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    align-items: end;
+  }
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .filter-group label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .table-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    text-align: left;
+  }
+  th {
+    background: #111827;
+    padding: 12px 16px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .tender-title {
+    font-weight: 600;
+    color: #fff;
+    font-size: 0.95rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .tender-org {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .meta-tag {
+    display: inline-block;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    background: #0f172a;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 4px;
+  }
+</style>
+
+<!-- Filter Form -->
+<div class="filters-card">
+  <form method="get" action="/">
+    <div class="filters-grid">
+      <div class="filter-group" style="grid-column: span 2;">
+        <label for="q">Search (Title, Org, Terms)</label>
+        <input type="text" id="q" name="q" value="{{ filters.q }}" placeholder="e.g. LPG, Valve, Cylinder...">
+      </div>
+
+      <div class="filter-group">
+        <label for="tier">Tier</label>
+        <select id="tier" name="tier">
+          <option value="all" {% if filters.tier == 'all' %}selected{% endif %}>All Tiers</option>
+          <option value="A" {% if filters.tier == 'A' %}selected{% endif %}>Tier A (Score ≥ 70)</option>
+          <option value="B" {% if filters.tier == 'B' %}selected{% endif %}>Tier B (Score 40-69)</option>
+          <option value="C" {% if filters.tier == 'C' %}selected{% endif %}>Tier C (Score < 40)</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="status">Workflow Status</label>
+        <select id="status" name="status">
+          <option value="all" {% if filters.status == 'all' %}selected{% endif %}>All Statuses</option>
+          <option value="new" {% if filters.status == 'new' %}selected{% endif %}>New</option>
+          <option value="interested" {% if filters.status == 'interested' %}selected{% endif %}>Interested</option>
+          <option value="bidding" {% if filters.status == 'bidding' %}selected{% endif %}>Bidding</option>
+          <option value="skipped" {% if filters.status == 'skipped' %}selected{% endif %}>Skipped</option>
+          <option value="submitted" {% if filters.status == 'submitted' %}selected{% endif %}>Submitted</option>
+        </select>
+      </div>
+
+      <div class="filter-group" style="grid-column: span 2;">
+        <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Kind Filter</label>
+        <div style="display: inline-flex; background: #111827; padding: 3px; border-radius: 6px; border: 1px solid var(--border); gap: 4px;">
+          <label style="cursor: pointer; padding: 4px 10px; border-radius: 4px; font-size: 0.82rem; font-weight: 600; margin: 0; background: {% if filters.tender_kind in ['products only', 'products_only', 'products', 'product'] %}#2563eb; color: #ffffff;{% else %}transparent; color: #9ca3af;{% endif %}">
+            <input type="radio" name="tender_kind" value="products only" onchange="this.form.submit()" style="display: none;" {% if filters.tender_kind in ['products only', 'products_only', 'products', 'product'] %}checked{% endif %}> products only
+          </label>
+          <label style="cursor: pointer; padding: 4px 10px; border-radius: 4px; font-size: 0.82rem; font-weight: 600; margin: 0; background: {% if filters.tender_kind in ['services only', 'services_only', 'services', 'service'] %}#2563eb; color: #ffffff;{% else %}transparent; color: #9ca3af;{% endif %}">
+            <input type="radio" name="tender_kind" value="services only" onchange="this.form.submit()" style="display: none;" {% if filters.tender_kind in ['services only', 'services_only', 'services', 'service'] %}checked{% endif %}> services only
+          </label>
+          <label style="cursor: pointer; padding: 4px 10px; border-radius: 4px; font-size: 0.82rem; font-weight: 600; margin: 0; background: {% if filters.tender_kind in ['both', 'all', ''] or not filters.tender_kind %}#2563eb; color: #ffffff;{% else %}transparent; color: #9ca3af;{% endif %}">
+            <input type="radio" name="tender_kind" value="both" onchange="this.form.submit()" style="display: none;" {% if filters.tender_kind in ['both', 'all', ''] or not filters.tender_kind %}checked{% endif %}> both
+          </label>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label for="source">Source</label>
+        <select id="source" name="source">
+          <option value="all" {% if filters.source == 'all' %}selected{% endif %}>All Sources</option>
+          <option value="gem" {% if filters.source == 'gem' %}selected{% endif %}>GeM</option>
+          <option value="cppp" {% if filters.source == 'cppp' %}selected{% endif %}>CPPP</option>
+          <option value="hmel" {% if filters.source == 'hmel' %}selected{% endif %}>HMEL</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="closing_window">Closing Window</label>
+        <select id="closing_window" name="closing_window">
+          <option value="all" {% if filters.closing_window == 'all' %}selected{% endif %}>All Windows</option>
+          <option value="urgent" {% if filters.closing_window == 'urgent' %}selected{% endif %}>Urgent (≤ 48h)</option>
+          <option value="soon" {% if filters.closing_window == 'soon' %}selected{% endif %}>Soon (48h - 7d)</option>
+          <option value="normal" {% if filters.closing_window == 'normal' %}selected{% endif %}>Normal (> 7d)</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="eligibility">Eligibility</label>
+        <select id="eligibility" name="eligibility">
+          <option value="all" {% if filters.eligibility == 'all' %}selected{% endif %}>All Eligibilities</option>
+          <option value="no_blockers_found" {% if filters.eligibility == 'no_blockers_found' %}selected{% endif %}>No Blockers Found</option>
+          <option value="likely_not_eligible" {% if filters.eligibility == 'likely_not_eligible' %}selected{% endif %}>Likely Not Eligible</option>
+          <option value="unknown" {% if filters.eligibility == 'unknown' %}selected{% endif %}>Unknown</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="match_basis">Match Basis</label>
+        <select id="match_basis" name="match_basis">
+          <option value="all" {% if filters.match_basis == 'all' %}selected{% endif %}>All</option>
+          <option value="item" {% if filters.match_basis == 'item' %}selected{% endif %}>Item match</option>
+          <option value="location_only" {% if filters.match_basis == 'location_only' %}selected{% endif %}>Location only</option>
+        </select>
+      </div>
+
+      <div class="filter-group" style="display: flex; flex-direction: row; align-items: center; gap: 8px; padding-bottom: 8px;">
+        <input type="checkbox" id="extended_only" name="extended_only" value="1" {% if filters.extended_only %}checked{% endif %}>
+        <label for="extended_only" style="cursor: pointer;">Extended Only</label>
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <button type="submit">Filter</button>
+        <a href="/" class="btn btn-secondary">Reset</a>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Header Summary & Export -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+  <div>
+    <h2>Matching Tenders ({{ total_count }})</h2>
+    <p style="color: var(--text-muted); font-size: 0.85rem;">
+      Default view: Open tenders, Tier A, closing in > 24 hours.
+    </p>
+  </div>
+  <div>
+    <a href="/export?{{ export_query }}" class="btn btn-secondary">📥 Export CSV</a>
+  </div>
+</div>
+
+<!-- Tenders Table -->
+<div class="table-card">
+  <table>
+    <thead>
+      <tr>
+        <th>Tier / Status</th>
+        <th>Tender Details</th>
+        <th>Score / Terms</th>
+        <th>EMD</th>
+        <th>Closing (IST)</th>
+        <th>Hours Left</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tenders %}
+      <tr>
+        <td>
+          <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
+            <div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">
+              <span class="badge badge-tier-{{ t.tier }}">Tier {{ t.tier }}</span>
+              {% if t.match_basis == 'location_only' %}
+                <span class="badge" style="background: #78350f; color: #fde68a; border: 1px solid #d97706; font-size: 0.72rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;">location only</span>
+              {% endif %}
+              {% if t.buyer_match %}
+                <span class="badge" style="background: #065f46; color: #a7f3d0; border: 1px solid #10b981; font-size: 0.72rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;">Oil/gas buyer, supply tender</span>
+              {% endif %}
+            </div>
+            {% if t.tender_kind == 'product' %}
+              <span class="badge" style="background: #1e3a8a; color: #93c5fd; border: 1px solid #3b82f6; font-size: 0.72rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;">Product</span>
+            {% elif t.tender_kind == 'service' %}
+              <span class="badge" style="background: #4c1d95; color: #d8b4fe; border: 1px solid #8b5cf6; font-size: 0.72rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;">Service</span>
+            {% elif t.tender_kind == 'mixed' %}
+              <span class="badge" style="background: #14532d; color: #86efac; border: 1px solid #22c55e; font-size: 0.72rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;">Mixed</span>
+            {% elif t.tender_kind == 'unknown' %}
+              <span class="badge" style="background: #334155; color: #94a3b8; border: 1px solid #475569; font-size: 0.72rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;">Unknown</span>
+            {% elif t.tender_kind %}
+              <span class="badge" style="background: #374151; color: #d1d5db; border: 1px solid #4b5563; font-size: 0.72rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;">{{ t.tender_kind }}</span>
+            {% endif %}
+            <span class="badge badge-status-{{ t.status }}">{{ t.status }}</span>
+            {% if t.owner %}
+              <span class="meta-tag">👤 {{ t.owner }}</span>
+            {% else %}
+              <span class="meta-tag" style="opacity: 0.65;">👤 Unassigned</span>
+            {% endif %}
+          </div>
+        </td>
+
+        <td style="max-width: 480px;">
+          <div>
+            <a href="/tenders/{{ t.id }}" class="tender-title">{{ t.title }}</a>
+            <div class="tender-org">{{ t.organisation }}</div>
+          </div>
+          <div style="margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap;">
+            <span class="meta-tag">{{ t.source|upper }}</span>
+            {% if t.tender_kind %}
+              <span class="meta-tag">{{ t.tender_kind }}</span>
+            {% endif %}
+            {% if t.buyer_match %}
+              <span class="badge" style="background: #065f46; color: #a7f3d0; border: 1px solid #10b981;">Oil/gas buyer, supply tender</span>
+            {% endif %}
+            {% if t.is_extended or t.date_check in ['extended_auto', 'extended_by_corrigendum'] %}
+              <span class="badge badge-extended">Extended</span>
+            {% endif %}
+            {% if t.details_needed or t.status == 'details needed' %}
+              <span class="badge badge-details-needed">Details Needed</span>
+            {% endif %}
+            {% if t.buyer_overrides_gem_fields %}
+              <span class="badge" style="background: #7f1d1d; color: #fca5a5; border: 1px solid #ef4444;" title="EMD / turnover set in buyer documents, check them before relying on these numbers">Buyer overrides EMD/Turnover</span>
+            {% endif %}
+            {% if not t.estimated_bid_value_inr and (t.floor_price_inr_min or t.floor_price_inr_max) %}
+              <span class="badge" style="background: #1e293b; color: #94a3b8; border: 1px solid #475569;">Floor price</span>
+            {% endif %}
+            {% if t.category_noise_reason %}
+              <span class="badge" style="background: #451a03; color: #fde68a; border: 1px solid #f59e0b;" title="{{ t.category_noise_reason }}">{{ t.category_noise_reason }}</span>
+            {% endif %}
+            {% if t.eligibility == 'no_blockers_found' %}
+              <span class="badge" style="background: #064e3b; color: #6ee7b7;">Eligible</span>
+            {% elif t.eligibility == 'likely_not_eligible' %}
+              <span class="badge" style="background: #7f1d1d; color: #fca5a5;">Ineligible</span>
+            {% endif %}
+          </div>
+        </td>
+
+        <td>
+          <div style="font-weight: 700; font-size: 1.1rem; color: #38bdf8;">
+            {{ t.relevance_score }}
+          </div>
+          <div style="font-size: 0.78rem; color: var(--text-muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ t.matched_terms }}">
+            {{ t.matched_terms or 'None' }}
+          </div>
+        </td>
+
+        <td style="white-space: nowrap;">
+          {% if t.emd_amount_inr %}
+            ₹{{ "{:,.0f}".format(t.emd_amount_inr) }}
+          {% elif t.emd_amount_inr_min or t.emd_amount_inr_max %}
+            ₹{{ "{:,.0f}".format(t.emd_amount_inr_min or 0) }} - ₹{{ "{:,.0f}".format(t.emd_amount_inr_max or 0) }}
+          {% elif t.emd_value %}
+            {{ t.emd_value }}
+          {% else %}
+            <span style="color: var(--text-muted);">Nil / Exempt</span>
+          {% endif %}
+        </td>
+
+        <td style="white-space: nowrap;">
+          <strong>{{ t.closing_ist }}</strong>
+          {% if t.date_check == 'extended_by_corrigendum' %}
+            <div style="font-size: 0.75rem; color: #fbbf24;">(via Corrigendum)</div>
+          {% elif t.date_check == 'extended_auto' %}
+            <div style="font-size: 0.75rem; color: #93c5fd;">(Auto-extended)</div>
+          {% endif %}
+        </td>
+
+        <td style="white-space: nowrap;">
+          {% if t.hours_to_close is not none %}
+            {% if t.hours_to_close <= 48 %}
+              <span style="color: #f87171; font-weight: 700;">{{ t.hours_to_close }}h left</span>
+            {% elif t.hours_to_close <= 168 %}
+              <span style="color: #fbbf24; font-weight: 600;">{{ t.hours_to_close }}h left</span>
+            {% else %}
+              <span style="color: #4ade80;">{{ t.hours_to_close }}h left</span>
+            {% endif %}
+          {% else %}
+            <span style="color: var(--text-muted);">N/A</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="6" style="text-align: center; padding: 32px; color: var(--text-muted);">
+          No matching tenders found. Try adjusting your filters.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

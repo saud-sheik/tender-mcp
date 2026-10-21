@@ -1,0 +1,12 @@
+[Unit]
+Description=Swamina Daily Tender Digest Email
+After=network.target
+
+[Service]
+Type=oneshot
+User=saud
+WorkingDirectory=/Users/saud/Projects/tender-mcp
+EnvironmentFile=/Users/saud/Projects/tender-mcp/.env
+ExecStart=/bin/bash -c 'if [ "$DIGEST_ENABLED" = "true" ]; then /usr/local/bin/python3 scripts/send_digest.py --send; else /usr/local/bin/python3 scripts/send_digest.py --dry-run; fi'
+StandardOutput=append:/Users/saud/Projects/tender-mcp/refresh.log
+StandardError=append:/Users/saud/Projects/tender-mcp/refresh.log
