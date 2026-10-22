@@ -579,6 +579,12 @@
               EMD ₹{{ "{:,.0f}".format(t.emd_amount_inr_min or 0) }} - ₹{{ "{:,.0f}".format(t.emd_amount_inr_max or 0) }}
             {% elif t.emd_value %}
               EMD {{ t.emd_value }}
+            {% elif t.source == 'cppp' %}
+              EMD <span style="color: var(--text-muted);">See portal</span>
+            {% elif t.source == 'gem' and (not t.pdf_parse_status or t.pdf_parse_status in ['none', '']) %}
+              EMD <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
+            {% elif t.pdf_parse_status == 'partial' %}
+              EMD <span style="color: var(--text-muted);">Not found in PDF</span>
             {% else %}
               EMD Nil / Exempt
             {% endif %}

@@ -376,7 +376,19 @@
           <!-- 1. Original Deadline -->
           <div class="timeline-node">
             <div class="timeline-dot"></div>
-            <div class="timeline-date">{{ tender.original_end_ist or tender.closing_ist }}</div>
+            <div class="timeline-date">
+              {% if tender.original_end_ist %}
+                {{ tender.original_end_ist }}
+              {% elif tender.source == 'cppp' %}
+                <span style="color: var(--text-muted);">See portal</span>
+              {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
+                <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
+              {% elif tender.pdf_parse_status == 'partial' %}
+                <span style="color: var(--text-muted);">Not found in PDF</span>
+              {% else %}
+                {{ tender.closing_ist }}
+              {% endif %}
+            </div>
             <div class="timeline-desc">Original deadline from the PDF{% if tender.original_end_utc %} ({{ tender.original_end_utc }}){% endif %}</div>
           </div>
 
@@ -548,13 +560,31 @@
                   {% endfor %}
                 </div>
               {% endif %}
+            {% elif tender.source == 'cppp' %}
+              <span style="color: var(--text-muted);">See portal</span>
+            {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
+              <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
+            {% elif tender.pdf_parse_status == 'partial' %}
+              <span style="color: var(--text-muted);">Not found in PDF</span>
             {% else %}
               Not Stated
             {% endif %}
           </div>
 
           <div class="kv-label">Quantity</div>
-          <div class="kv-val">{{ tender.total_quantity or 'N/A' }}</div>
+          <div class="kv-val">
+            {% if tender.total_quantity %}
+              {{ tender.total_quantity }}
+            {% elif tender.source == 'cppp' %}
+              <span style="color: var(--text-muted);">See portal</span>
+            {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
+              <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
+            {% elif tender.pdf_parse_status == 'partial' %}
+              <span style="color: var(--text-muted);">Not found in PDF</span>
+            {% else %}
+              N/A
+            {% endif %}
+          </div>
 
           <div class="kv-label">EMD Details</div>
           <div class="kv-val">
@@ -564,6 +594,12 @@
               ₹{{ "{:,.0f}".format(tender.emd_amount_inr_min or 0) }} - ₹{{ "{:,.0f}".format(tender.emd_amount_inr_max or 0) }}
             {% elif tender.emd_value %}
               {{ tender.emd_value }}
+            {% elif tender.source == 'cppp' %}
+              <span style="color: var(--text-muted);">See portal</span>
+            {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
+              <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
+            {% elif tender.pdf_parse_status == 'partial' %}
+              <span style="color: var(--text-muted);">Not found in PDF</span>
             {% else %}
               Nil / Exempt
             {% endif %}
@@ -592,24 +628,74 @@
                   {% endfor %}
                 </div>
               {% endif %}
+            {% elif tender.source == 'cppp' %}
+              <span style="color: var(--text-muted);">See portal</span>
+            {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
+              <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
+            {% elif tender.pdf_parse_status == 'partial' %}
+              <span style="color: var(--text-muted);">Not found in PDF</span>
             {% else %}
               No
             {% endif %}
           </div>
 
           <div class="kv-label">MSE Reserved</div>
-          <div class="kv-val">{{ 'Yes' if tender.mse_reserved else 'No' }}</div>
+          <div class="kv-val">
+            {% if tender.mse_reserved %}
+              Yes
+            {% elif tender.source == 'cppp' %}
+              <span style="color: var(--text-muted);">See portal</span>
+            {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
+              <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
+            {% elif tender.pdf_parse_status == 'partial' %}
+              <span style="color: var(--text-muted);">Not found in PDF</span>
+            {% else %}
+              No
+            {% endif %}
+          </div>
 
           <div class="kv-label">MII Restriction</div>
-          <div class="kv-val">{{ tender.mii_class_restriction or 'None' }}</div>
+          <div class="kv-val">
+            {% if tender.mii_class_restriction and tender.mii_class_restriction not in ['None', 'not_stated', ''] %}
+              {{ tender.mii_class_restriction }}
+            {% elif tender.source == 'cppp' %}
+              <span style="color: var(--text-muted);">See portal</span>
+            {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
+              <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
+            {% elif tender.pdf_parse_status == 'partial' %}
+              <span style="color: var(--text-muted);">Not found in PDF</span>
+            {% else %}
+              None
+            {% endif %}
+          </div>
 
           <div class="kv-label">BIS Required</div>
-          <div class="kv-val">{{ 'Yes' if tender.bis_required == 1 else ('No' if tender.bis_required == 0 else 'Not Stated') }}</div>
+          <div class="kv-val">
+            {% if tender.bis_required == 1 or tender.bis_required is sameas true %}
+              Yes
+            {% elif tender.bis_required == 0 or tender.bis_required is sameas false %}
+              No
+            {% elif tender.source == 'cppp' %}
+              <span style="color: var(--text-muted);">See portal</span>
+            {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
+              <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
+            {% elif tender.pdf_parse_status == 'partial' %}
+              <span style="color: var(--text-muted);">Not found in PDF</span>
+            {% else %}
+              Not Stated
+            {% endif %}
+          </div>
 
           <div class="kv-label">Min Turnover</div>
           <div class="kv-val">
             {% if tender.min_turnover_lakh %}
               {{ tender.min_turnover_lakh }} Lakhs
+            {% elif tender.source == 'cppp' %}
+              <span style="color: var(--text-muted);">See portal</span>
+            {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
+              <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
+            {% elif tender.pdf_parse_status == 'partial' %}
+              <span style="color: var(--text-muted);">Not found in PDF</span>
             {% else %}
               Not Stated
             {% endif %}
@@ -619,6 +705,12 @@
           <div class="kv-val">
             {% if tender.years_experience_required %}
               {{ tender.years_experience_required }} Years
+            {% elif tender.source == 'cppp' %}
+              <span style="color: var(--text-muted);">See portal</span>
+            {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
+              <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
+            {% elif tender.pdf_parse_status == 'partial' %}
+              <span style="color: var(--text-muted);">Not found in PDF</span>
             {% else %}
               Not Stated
             {% endif %}
@@ -634,7 +726,19 @@
           </div>
 
           <div class="kv-label">Consignee City</div>
-          <div class="kv-val">{{ tender.consignee_city or 'Not Stated' }}</div>
+          <div class="kv-val">
+            {% if tender.consignee_city and tender.consignee_city not in ['Not Stated', 'not_stated', ''] %}
+              {{ tender.consignee_city }}
+            {% elif tender.source == 'cppp' %}
+              <span style="color: var(--text-muted);">See portal</span>
+            {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
+              <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
+            {% elif tender.pdf_parse_status == 'partial' %}
+              <span style="color: var(--text-muted);">Not found in PDF</span>
+            {% else %}
+              Not Stated
+            {% endif %}
+          </div>
         </div>
       </div>
     </div>
