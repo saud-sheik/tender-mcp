@@ -413,4 +413,119 @@ def test_dashboard_redesign_kpis_and_form():
     assert "Save Changes" in r_detail.text
 
 
+def test_pdf_parse_status_and_cppp_labels():
+    """Verify portal status fallback labels for unparsed GeM, parsed ok, and CPPP tenders."""
+    client = TestClient(app)
+    auth = _get_auth_header()
+
+    # 1. Unparsed GeM tender (pdf_parse_status='none' by default)
+    t_unparsed = {
+        "id": "gem:GEM_UNPARSED_999",
+        "source": "gem",
+        "title": "Unparsed GeM Safety Valves",
+        "organisation": "ONGC",
+        "category": "Goods",
+        "published_date": "2026-10-01T00:00:00Z",
+        "closing_date": "2026-11-20T10:00:00Z",
+        "relevance_score": 85,
+        "status": "new",
+        "raw": {},
+    }
+    db_module.upsert_tender(t_unparsed)
+
+    # 2. Parsed (ok) GeM tender with no EMD
+    t_parsed_ok = {
+        "id": "gem:GEM_PARSED_OK_999",
+        "source": "gem",
+        "title": "Parsed GeM Gas Chromatograph",
+        "organisation": "BPCL",
+        "category": "Goods",
+        "published_date": "2026-10-01T00:00:00Z",
+        "closing_date": "2026-11-20T10:00:00Z",
+        "relevance_score": 80,
+        "status": "new",
+        "raw": {},
+    }
+    db_module.upsert_tender(t_parsed_ok)
+    with db_module.get_conn() as conn:
+        conn.execute("UPDATE tenders SET pdf_parse_status = 'ok' WHERE id = ?", (t_parsed_ok["id"],))
+        conn.commit()
+
+    # 3. CPPP tender
+    t_cppp = {
+        "id": "cppp:CPPP_TEST_999",
+        "source": "cppp",
+        "title": "CPPP Nitrogen Supply System",
+        "organisation": "IOCL",
+        "category": "Goods",
+        "published_date": "2026-10-01T00:00:00Z",
+        "closing_date": "2026-11-20T10:00:00Z",
+        "relevance_score": 75,
+        "status": "new",
+        "raw": {},
+    }
+    db_module.upsert_tender(t_cppp)
+
+    # 4. Partial parsed GeM tender
+    t_partial = {
+        "id": "gem:GEM_PARTIAL_999",
+        "source": "gem",
+        "title": "Partial GeM Flow Meters",
+        "organisation": "GAIL",
+        "category": "Goods",
+        "published_date": "2026-10-01T00:00:00Z",
+        "closing_date": "2026-11-20T10:00:00Z",
+        "relevance_score": 70,
+        "status": "new",
+        "raw": {},
+    }
+    db_module.upsert_tender(t_partial)
+    with db_module.get_conn() as conn:
+        conn.execute("UPDATE tenders SET pdf_parse_status = 'partial' WHERE id = ?", (t_partial["id"],))
+        conn.commit()
+
+    # --- LIST VIEW CHECKS ---
+    r_list = client.get("/", headers=auth)
+    assert r_list.status_code == 200
+
+    # (a) unparsed GeM tender shows new label and NOT "Nil / Exempt" in list
+    unparsed_chunk = r_list.text.split(f'data-id="{t_unparsed["id"]}"')[1].split('</div>\n      </div>')[0]
+    assert "Not extracted yet, check portal" in unparsed_chunk
+    assert "Nil / Exempt" not in unparsed_chunk
+
+    # (b) parsed (ok) tender with no EMD still shows "Nil / Exempt" in list
+    parsed_ok_chunk = r_list.text.split(f'data-id="{t_parsed_ok["id"]}"')[1].split('</div>\n      </div>')[0]
+    assert "EMD Nil / Exempt" in parsed_ok_chunk
+
+    # (c) CPPP tender shows "See portal" and NOT "Nil / Exempt" in list
+    cppp_chunk = r_list.text.split(f'data-id="{t_cppp["id"]}"')[1].split('</div>\n      </div>')[0]
+    assert "See portal" in cppp_chunk
+    assert "Nil / Exempt" not in cppp_chunk
+
+    # --- DETAIL VIEW CHECKS ---
+    # (a) unparsed GeM tender detail page shows new label and NOT "Nil / Exempt"
+    r_detail_unparsed = client.get(f"/tenders/{t_unparsed['id']}", headers=auth)
+    assert r_detail_unparsed.status_code == 200
+    assert "Not extracted yet, check portal" in r_detail_unparsed.text
+    assert "Nil / Exempt" not in r_detail_unparsed.text
+
+    # (b) parsed (ok) tender with no EMD still shows "Nil / Exempt" on detail page
+    r_detail_ok = client.get(f"/tenders/{t_parsed_ok['id']}", headers=auth)
+    assert r_detail_ok.status_code == 200
+    assert "Nil / Exempt" in r_detail_ok.text
+
+    # (c) CPPP tender shows "See portal" and NOT "Nil / Exempt" on detail page
+    r_detail_cppp = client.get(f"/tenders/{t_cppp['id']}", headers=auth)
+    assert r_detail_cppp.status_code == 200
+    assert "See portal" in r_detail_cppp.text
+    assert "Nil / Exempt" not in r_detail_cppp.text
+
+    # Partial tender detail page shows "Not found in PDF"
+    r_detail_partial = client.get(f"/tenders/{t_partial['id']}", headers=auth)
+    assert r_detail_partial.status_code == 200
+    assert "Not found in PDF" in r_detail_partial.text
+    assert "Nil / Exempt" not in r_detail_partial.text
+
+
+
 
