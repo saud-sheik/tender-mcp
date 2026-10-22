@@ -4,145 +4,297 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Swamina Tender Aggregator{% endblock %}</title>
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('swamina-theme');
+        if (saved) {
+          document.documentElement.setAttribute('data-theme', saved);
+        }
+      } catch (e) {}
+    })();
+  </script>
   <style>
     :root {
+      --bg: #f4f6f3;
+      --card-bg: #ffffff;
+      --card-subtle: #f8faf7;
+      --border: #e2e6df;
+      --border-subtle: #edf0eb;
+      --text: #1a221f;
+      --text-muted: #5e6d66;
+      --text-dim: #8a9991;
+      --primary: #1f7a5c;
+      --primary-hover: #176048;
+      --primary-light: #e8f4ef;
+      --primary-tint: #f0f7f4;
+      --success: #1f7a5c;
+      --warning: #b45309;
+      --warning-bg: #fef3c7;
+      --danger: #b91c1c;
+      --danger-bg: #fee2e2;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05);
+      --radius: 12px;
+      --radius-sm: 6px;
+      --radius-pill: 9999px;
+    }
+
+    [data-theme="dark"] {
       --bg: #0f172a;
       --card-bg: #1e293b;
+      --card-subtle: #172033;
       --border: #334155;
+      --border-subtle: #27354a;
       --text: #f8fafc;
       --text-muted: #94a3b8;
-      --primary: #3b82f6;
-      --primary-hover: #2563eb;
-      --success: #10b981;
+      --text-dim: #64748b;
+      --primary: #22c55e;
+      --primary-hover: #16a34a;
+      --primary-light: #064e3b;
+      --primary-tint: #0f2d24;
+      --success: #22c55e;
       --warning: #f59e0b;
+      --warning-bg: #451a03;
       --danger: #ef4444;
-      --badge-bg: #334155;
+      --danger-bg: #450a0a;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
     }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
       line-height: 1.5;
       padding-bottom: 60px;
-    }
-    a { color: var(--primary); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    
-    /* Top Warning Banner */
-    .banner {
-      background: #7c2d12;
-      color: #ffedd5;
-      text-align: center;
-      padding: 10px 16px;
-      font-weight: 600;
-      font-size: 0.95rem;
-      border-bottom: 2px solid #ea580c;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* Health Strip */
-    .health-strip {
+    a {
+      color: var(--primary);
+      text-decoration: none;
+      transition: color 0.15s ease;
+    }
+    a:hover {
+      color: var(--primary-hover);
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    /* Top Slim Warning Strip */
+    .banner {
+      background: #fffbeb;
+      color: #92400e;
+      text-align: center;
+      padding: 6px 16px;
+      font-weight: 500;
+      font-size: 0.8rem;
+      border-bottom: 1px solid #fde68a;
+    }
+    [data-theme="dark"] .banner {
+      background: #3b1d08;
+      color: #fef3c7;
+      border-bottom: 1px solid #78350f;
+    }
+
+    /* Single-Row Header */
+    header.app-header {
       background: var(--card-bg);
       border-bottom: 1px solid var(--border);
-      padding: 8px 24px;
-      font-size: 0.85rem;
+      padding: 12px 24px;
       display: flex;
       flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
-      gap: 12px;
+      gap: 16px;
     }
-    .health-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 3px 8px;
-      border-radius: 4px;
-      font-weight: 600;
-    }
-    .health-ok { background: #064e3b; color: #6ee7b7; }
-    .health-stale { background: #7f1d1d; color: #fca5a5; }
 
-    /* Header Nav */
-    header {
-      background: #111827;
-      border-bottom: 1px solid var(--border);
-      padding: 14px 24px;
+    .header-left {
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      gap: 20px;
     }
+
     .logo {
       font-size: 1.25rem;
       font-weight: 700;
-      color: #fff;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      text-decoration: none;
     }
-    .logo span { color: var(--primary); }
-    .nav-links { display: flex; gap: 16px; align-items: center; font-size: 0.9rem; }
+    .logo-accent {
+      color: var(--primary);
+    }
+
+    .nav-tabs {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--border-subtle);
+      padding: 3px;
+      border-radius: 8px;
+    }
+    .nav-tab {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .nav-tab:hover {
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+
+    .health-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: 600;
+    }
+    .health-ok {
+      color: var(--primary);
+    }
+    .health-stale {
+      color: var(--danger);
+    }
+
+    .health-counts strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .btn-theme {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-theme:hover {
+      background: var(--border-subtle);
+    }
 
     /* Container */
     .container {
       max-width: 1440px;
       margin: 0 auto;
-      padding: 24px;
+      padding: 20px 24px;
     }
 
-    /* Badges */
+    /* Badges & Chips */
     .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 0.75rem;
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: var(--radius-pill);
+      font-size: 0.72rem;
       font-weight: 600;
-      text-transform: uppercase;
+      letter-spacing: 0.01em;
+      border: 1px solid transparent;
+      white-space: nowrap;
     }
-    .badge-tier-A { background: #065f46; color: #6ee7b7; }
-    .badge-tier-B { background: #1e40af; color: #93c5fd; }
-    .badge-tier-C { background: #374151; color: #9ca3af; }
-    .badge-extended { background: #854d0e; color: #fef08a; }
-    .badge-details-needed { background: #991b1b; color: #fecaca; }
-    .badge-status-new { background: #1e3a8a; color: #bfdbfe; }
-    .badge-status-interested { background: #065f46; color: #a7f3d0; }
-    .badge-status-bidding { background: #581c87; color: #e9d5ff; }
-    .badge-status-skipped { background: #374151; color: #9ca3af; }
-    .badge-status-submitted { background: #14532d; color: #bbf7d0; }
+    .badge-tier-A { background: #e8f5e9; color: #1e7e34; border-color: #c8e6c9; }
+    .badge-tier-B { background: #e3f2fd; color: #1565c0; border-color: #bbdefb; }
+    .badge-tier-C { background: #f3f4f6; color: #4b5563; border-color: #e5e7eb; }
+    .badge-extended { background: #fef9c3; color: #854d0e; border-color: #fef08a; }
+    .badge-details-needed { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+    .badge-status-new { background: #e0f2fe; color: #0369a1; border-color: #bae6fd; }
+    .badge-status-interested { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+    .badge-status-bidding { background: #f3e8ff; color: #7e22ce; border-color: #e9d5ff; }
+    .badge-status-skipped { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+    .badge-status-submitted { background: #dcfce7; color: #15803d; border-color: #86efac; }
+
+    [data-theme="dark"] .badge-tier-A { background: #064e3b; color: #6ee7b7; border-color: #047857; }
+    [data-theme="dark"] .badge-tier-B { background: #1e3a8a; color: #93c5fd; border-color: #1d4ed8; }
+    [data-theme="dark"] .badge-tier-C { background: #374151; color: #9ca3af; border-color: #4b5563; }
+    [data-theme="dark"] .badge-extended { background: #713f12; color: #fef08a; border-color: #a16207; }
+    [data-theme="dark"] .badge-details-needed { background: #7f1d1d; color: #fecaca; border-color: #991b1b; }
+    [data-theme="dark"] .badge-status-new { background: #0c4a6e; color: #7dd3fc; border-color: #0284c7; }
+    [data-theme="dark"] .badge-status-interested { background: #064e3b; color: #6ee7b7; border-color: #059669; }
+    [data-theme="dark"] .badge-status-bidding { background: #581c87; color: #d8b4fe; border-color: #7e22ce; }
+    [data-theme="dark"] .badge-status-skipped { background: #334155; color: #cbd5e1; border-color: #475569; }
+    [data-theme="dark"] .badge-status-submitted { background: #14532d; color: #86efac; border-color: #16a34a; }
 
     /* Form Controls */
     select, input[type="text"], textarea {
-      background: #0f172a;
+      background: var(--card-bg);
       border: 1px solid var(--border);
       color: var(--text);
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 0.9rem;
+      padding: 7px 11px;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      font-family: inherit;
     }
     select:focus, input[type="text"]:focus, textarea:focus {
       outline: none;
       border-color: var(--primary);
     }
     button, .btn {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
       background: var(--primary);
       color: #fff;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 6px;
-      font-size: 0.9rem;
+      border: 1px solid transparent;
+      padding: 7px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
       font-weight: 600;
       cursor: pointer;
       text-decoration: none;
+      transition: all 0.15s ease;
+      font-family: inherit;
     }
     button:hover, .btn:hover {
       background: var(--primary-hover);
+      color: #fff;
       text-decoration: none;
     }
     .btn-secondary {
-      background: #475569;
+      background: var(--card-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
     }
     .btn-secondary:hover {
-      background: #334155;
+      background: var(--border-subtle);
+      color: var(--text);
     }
   </style>
+  <script>
+    function toggleTheme() {
+      try {
+        var current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+        var next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('swamina-theme', next);
+      } catch (e) {}
+    }
+  </script>
   {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -151,42 +303,37 @@
     ⚠️ Deadlines can be extended. Confirm the live deadline on GeM before bidding.
   </div>
 
-  <!-- Health Strip -->
-  <div class="health-strip">
-    <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <a href="/" class="logo">
+        <span>Swamina</span>
+        <span class="logo-accent">Tenders</span>
+      </a>
+      <nav class="nav-tabs">
+        <a href="/" class="nav-tab">All Tenders</a>
+        <a href="/?tier=A" class="nav-tab">Tier A Tenders</a>
+        <a href="/?extended_only=1" class="nav-tab">Extended Bids</a>
+      </nav>
+    </div>
+
+    <div class="header-right">
       <div>
-        <strong>Refresh Health:</strong>
         {% if health.is_stale %}
-          <span class="health-badge health-stale">⚠️ STALE ({{ health.age_hours }}h ago)</span>
+          <span class="health-indicator health-stale">● Refresh STALE ({{ health.age_hours }}h ago)</span>
         {% else %}
-          <span class="health-badge health-ok">✓ OK ({{ health.age_hours }}h ago)</span>
+          <span class="health-indicator health-ok">● Refresh OK ({{ health.age_hours }}h ago)</span>
         {% endif %}
       </div>
       <div>
-        <span style="color: var(--text-muted);">Last run:</span> {{ health.last_run_ist }}
+        Last run <strong>{{ health.last_run_ist }}</strong>
       </div>
-      <div>
-        <span style="color: var(--text-muted);">Recent counts:</span>
-        CPPP: {{ health.sources.cppp.new }} new / {{ health.sources.cppp.fetched }} fetched
-        | GeM: {{ health.sources.gem.new }} new / {{ health.sources.gem.fetched }} fetched
-        | HMEL: {{ health.sources.hmel.new }} new / {{ health.sources.hmel.fetched }} fetched
+      <div class="health-counts">
+        CPPP <strong>{{ health.sources.cppp.new }} new</strong> of {{ health.sources.cppp.fetched }} · GeM <strong>{{ health.sources.gem.new }} new</strong> of {{ health.sources.gem.fetched }} · HMEL <strong>{{ health.sources.hmel.new }} new</strong> of {{ health.sources.hmel.fetched }}
       </div>
+      <a href="/health" style="font-size: 0.8rem; color: var(--text-dim);" title="JSON Status API">API</a>
+      <button type="button" class="btn-theme" onclick="toggleTheme()" aria-label="Toggle light or dark theme">Theme</button>
     </div>
-    <div>
-      <a href="/health" style="font-size: 0.8rem; color: var(--text-muted);">JSON Status API</a>
-    </div>
-  </div>
-
-  <!-- Header -->
-  <header>
-    <div class="logo">
-      <a href="/" style="color: inherit; text-decoration: none;">Swamina <span>Tenders</span></a>
-    </div>
-    <nav class="nav-links">
-      <a href="/">All Tenders</a>
-      <a href="/?tier=A">Tier A Tenders</a>
-      <a href="/?extended_only=1">Extended Bids</a>
-    </nav>
   </header>
 
   <!-- Main Content -->
@@ -195,3 +342,4 @@
   </main>
 </body>
 </html>
+

@@ -42,7 +42,7 @@ def test_tenders_db_untouched_after_crud_operations():
         "link": "https://example.com/safety",
         "status": "active",
     })
-    results = db_module.query_tenders()
+    results = db_module.query_tenders(include_expired=True)
     assert any(t["id"] == "gem:TEST_SAFETY_001" for t in results)
 
     # Ensure production DB was NOT modified

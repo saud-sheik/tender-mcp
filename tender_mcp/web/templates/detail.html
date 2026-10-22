@@ -4,487 +4,721 @@
 
 {% block content %}
 <style>
-  .detail-layout {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 24px;
-    align-items: start;
-  }
-  .card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 24px;
-  }
-  .card-title {
-    font-size: 1.1rem;
-    font-weight: 700;
+  .back-nav {
     margin-bottom: 16px;
-    color: #fff;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 8px;
   }
-  .data-grid {
-    display: grid;
-    grid-template-columns: 140px 1fr;
-    gap: 8px 16px;
-    font-size: 0.9rem;
-  }
-  .data-label {
+  .back-nav a {
+    font-size: 0.85rem;
+    font-weight: 500;
     color: var(--text-muted);
-    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
   }
-  .data-value {
-    color: var(--text);
-    word-break: break-word;
+  .back-nav a:hover {
+    color: var(--primary);
+    text-decoration: none;
   }
-  .status-form {
+
+  /* Container for extractor in list pane & standalone */
+  .detail-container {
     display: flex;
     flex-direction: column;
     gap: 16px;
   }
-  .btn-group {
+
+  .standalone-grid {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    .standalone-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* Pane / Card components */
+  .detail-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    box-shadow: var(--shadow-sm);
+  }
+  .detail-card-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Title & Header Section */
+  .detail-chips-row {
     display: flex;
     flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .detail-main-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.35;
+    margin-bottom: 6px;
+  }
+  .detail-org-name {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  /* Deadline Hero Card */
+  .deadline-hero {
+    background: var(--primary-tint);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 14px 0 16px 0;
+  }
+  .hero-days-val {
+    font-size: 1.85rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--primary);
+    white-space: nowrap;
+  }
+  .hero-days-val.urgent { color: var(--danger); }
+  .hero-days-val.soon { color: var(--warning); }
+  .hero-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .hero-closing-date {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .hero-closing-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  /* Vertical Timeline */
+  .timeline {
+    position: relative;
+    padding-left: 20px;
+    margin: 8px 0 14px 0;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    left: 6px;
+    width: 2px;
+    background: var(--border);
+  }
+  .timeline-node {
+    position: relative;
+    margin-bottom: 14px;
+  }
+  .timeline-node:last-child {
+    margin-bottom: 0;
+  }
+  .timeline-dot {
+    position: absolute;
+    left: -20px;
+    top: 4px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--card-bg);
+    border: 2px solid var(--border);
+  }
+  .timeline-dot.active {
+    background: var(--primary);
+    border-color: var(--primary);
+  }
+  .timeline-dot.limit {
+    border-style: dashed;
+    border-color: var(--text-muted);
+  }
+  .timeline-date {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .timeline-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 1px;
+  }
+
+  /* Grid details */
+  .kv-grid {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 8px 12px;
+    font-size: 0.82rem;
+  }
+  .kv-label {
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .kv-val {
+    color: var(--text);
+    word-break: break-word;
+  }
+
+  /* Notice boxes */
+  .notice-banner {
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
     gap: 8px;
+  }
+  .notice-danger {
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+  }
+  .notice-warning {
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    color: #92400e;
+  }
+  .notice-success {
+    background: #e8f5e9;
+    border: 1px solid #c8e6c9;
+    color: #1e7e34;
+  }
+  [data-theme="dark"] .notice-danger { background: #450a0a; border-color: #7f1d1d; color: #fecaca; }
+  [data-theme="dark"] .notice-warning { background: #451a03; border-color: #78350f; color: #fde68a; }
+  [data-theme="dark"] .notice-success { background: #064e3b; border-color: #047857; color: #a7f3d0; }
+
+  /* Chips and Tags */
+  .chip-tag {
+    display: inline-block;
+    background: var(--card-subtle);
+    border: 1px solid var(--border);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    color: var(--text);
+  }
+  .chip-flag {
+    display: inline-block;
+    background: #e0e7ff;
+    border: 1px solid #c7d2fe;
+    color: #3730a3;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+  }
+  [data-theme="dark"] .chip-flag {
+    background: #312e81;
+    border-color: #4338ca;
+    color: #c7d2fe;
+  }
+
+  /* Status Radio Pills */
+  .status-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .status-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
   }
   .status-radio {
     display: none;
   }
-  .status-btn {
-    padding: 6px 12px;
+  .status-pill-btn {
+    padding: 5px 12px;
     border: 1px solid var(--border);
     border-radius: 6px;
-    background: #0f172a;
+    background: var(--card-bg);
     color: var(--text);
     cursor: pointer;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 600;
     text-transform: capitalize;
+    transition: all 0.15s ease;
   }
-  .status-radio:checked + .status-btn {
+  .status-pill-btn:hover {
+    border-color: var(--primary);
+  }
+  .status-radio:checked + .status-pill-btn {
     background: var(--primary);
-    border-color: var(--primary-hover);
-    color: #fff;
+    border-color: var(--primary);
+    color: #ffffff;
   }
-  .history-table {
+
+  /* History Table */
+  .history-tbl {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.82rem;
-    margin-top: 8px;
+    font-size: 0.78rem;
+    margin-top: 6px;
   }
-  .history-table th, .history-table td {
-    padding: 6px 10px;
+  .history-tbl th, .history-tbl td {
+    padding: 6px 8px;
     border-bottom: 1px solid var(--border);
     text-align: left;
   }
-  .history-table th { color: var(--text-muted); }
+  .history-tbl th {
+    color: var(--text-muted);
+    font-weight: 600;
+  }
 </style>
 
-<div style="margin-bottom: 16px;">
-  <a href="/" style="font-size: 0.9rem;">← Back to Tender Listing</a>
+<div class="back-nav">
+  <a href="/">← Back to Tender Listing</a>
 </div>
 
-<div class="detail-layout">
-  <!-- Left Column: Tender Information & Enriched Fields -->
-  <div>
-    <!-- Main Header Card -->
-    <div class="card">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
-        <div>
+<!-- Extractor target for list preview and standalone view -->
+<div id="tender-detail-content" class="detail-container">
+  <div class="standalone-grid">
+    <!-- Left Column: Primary Content -->
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <!-- Main Overview Card -->
+      <div class="detail-card">
+        <!-- Chip Row -->
+        <div class="detail-chips-row">
           <span class="badge badge-tier-{{ tender.tier }}">Tier {{ tender.tier }}</span>
-          {% if tender.match_basis == 'location_only' %}
-            <span class="badge" style="background: #78350f; color: #fde68a; border: 1px solid #d97706;">location only</span>
-          {% endif %}
-          {% if tender.buyer_match %}
-            <span class="badge" style="background: #065f46; color: #a7f3d0; border: 1px solid #10b981;">Oil/gas buyer, supply tender</span>
+          <span class="badge" style="background: var(--border-subtle); color: var(--text-muted);">{{ tender.source|upper }}</span>
+          {% if tender.tender_kind %}
+            <span class="badge" style="background: var(--border-subtle); color: var(--text-muted);">{{ tender.tender_kind }}</span>
           {% endif %}
           <span class="badge badge-status-{{ tender.status }}">{{ tender.status }}</span>
-          <span class="badge" style="background: #334155; color: #cbd5e1;">{{ tender.source|upper }}</span>
-          {% if tender.tender_kind %}
-            <span class="badge" style="background: #1e293b; color: #93c5fd; border: 1px solid #3b82f6;">{{ tender.tender_kind }}</span>
-          {% endif %}
+          <span class="badge" style="background: var(--primary-tint); color: var(--primary); border-color: var(--primary);">Score {{ tender.relevance_score }}</span>
+
           {% if tender.is_extended %}
             <span class="badge badge-extended">Extended</span>
           {% endif %}
           {% if tender.details_needed %}
             <span class="badge badge-details-needed">Details Needed</span>
           {% endif %}
-        </div>
-        <div style="text-align: right;">
-          <div style="font-size: 1.5rem; font-weight: 700; color: #38bdf8;">Score: {{ tender.relevance_score }}</div>
-        </div>
-      </div>
-
-      <h1 style="font-size: 1.35rem; color: #fff; margin: 12px 0 6px 0;">{{ tender.title }}</h1>
-      <div style="color: var(--text-muted); font-size: 0.95rem;">{{ tender.organisation }}</div>
-
-      <div style="margin-top: 16px;">
-        {% if tender.link %}
-          <a href="{{ tender.link }}" target="_blank" rel="noopener noreferrer" class="btn">
-            🔗 Open Portal Page / Document
-          </a>
-        {% endif %}
-      </div>
-    </div>
-
-    <!-- Dates & Extension Tracking Card -->
-    <div class="card">
-      <div class="card-title">📅 Deadline & Date History</div>
-      <div class="data-grid">
-        <div class="data-label">Live Deadline (IST)</div>
-        <div class="data-value">
-          <strong style="color: #38bdf8; font-size: 1.05rem;">{{ tender.closing_ist }}</strong>
-          {% if tender.hours_to_close is not none %}
-            ({{ tender.hours_to_close }} hours remaining)
+          {% if tender.match_basis == 'location_only' %}
+            <span class="badge" style="background: #fef3c7; color: #92400e; border-color: #fde68a;">location only</span>
+          {% endif %}
+          {% if tender.buyer_match %}
+            <span class="badge" style="background: #e8f5e9; color: #1e7e34; border-color: #c8e6c9;">Oil/gas buyer, supply tender</span>
+          {% endif %}
+          {% if tender.buyer_overrides_gem_fields %}
+            <span class="badge" style="background: #fee2e2; color: #991b1b; border-color: #fecaca;" title="EMD / turnover set in buyer documents, check them before relying on these numbers">Buyer overrides EMD/Turnover</span>
+          {% endif %}
+          {% if not tender.estimated_bid_value_inr and (tender.floor_price_inr_min or tender.floor_price_inr_max) %}
+            <span class="badge" style="background: var(--card-subtle); color: var(--text-muted); border-color: var(--border);">Floor price</span>
+          {% endif %}
+          {% if tender.category_noise_reason %}
+            <span class="badge" style="background: #fef3c7; color: #92400e; border-color: #fde68a;" title="{{ tender.category_noise_reason }}">{{ tender.category_noise_reason }}</span>
+          {% endif %}
+          {% if tender.eligibility == 'no_blockers_found' %}
+            <span class="badge badge-tier-A">Eligible</span>
+          {% elif tender.eligibility == 'likely_not_eligible' %}
+            <span class="badge badge-details-needed">Ineligible</span>
           {% endif %}
         </div>
 
-        <div class="data-label">Live Deadline (UTC)</div>
-        <div class="data-value">{{ tender.closing_date or 'N/A' }}</div>
+        <h1 class="detail-main-title">{{ tender.title }}</h1>
+        <div class="detail-org-name">{{ tender.organisation }}</div>
 
-        <div class="data-label">Original PDF End</div>
-        <div class="data-value">{{ tender.original_end_ist }} ({{ tender.original_end_utc or 'N/A' }})</div>
+        <!-- Deadline Hero Card -->
+        <div class="deadline-hero">
+          {% set days_int = ((tender.hours_to_close / 24) | round(0) | int) if tender.hours_to_close is not none else none %}
+          {% if tender.hours_to_close is not none %}
+            {% if tender.hours_to_close <= 48 %}
+              <div class="hero-days-val urgent">{{ tender.hours_to_close }}h</div>
+            {% elif tender.hours_to_close <= 168 %}
+              <div class="hero-days-val soon">{{ days_int }} days</div>
+            {% else %}
+              <div class="hero-days-val">{{ days_int }} days</div>
+            {% endif %}
+          {% else %}
+            <div class="hero-days-val" style="color: var(--text-dim);">N/A</div>
+          {% endif %}
 
-        <div class="data-label">Auto Limit</div>
-        <div class="data-value">{{ tender.auto_extension_limit_ist }} ({{ tender.auto_extension_limit_utc or 'N/A' }})</div>
-
-        <div class="data-label">Date Check</div>
-        <div class="data-value">
-          <code style="background: #0f172a; padding: 2px 6px; border-radius: 4px;">{{ tender.date_check }}</code>
+          <div class="hero-meta">
+            <div class="hero-closing-date">{{ tender.closing_ist }}</div>
+            <div class="hero-closing-label">Live deadline</div>
+          </div>
         </div>
 
-        <div class="data-label">Extensions Seen</div>
-        <div class="data-value">{{ tender.extensions_seen }} (upward changes observed by refresh since ingestion)</div>
-
-        {% if tender.corrigendum_date %}
-          <div class="data-label">Corrigendum Date</div>
-          <div class="data-value" style="color: #fbbf24;">{{ tender.corrigendum_date }}</div>
+        {% if tender.link %}
+          <div style="margin-top: 12px;">
+            <a href="{{ tender.link }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
+              Open portal page
+            </a>
+          </div>
         {% endif %}
       </div>
 
-      <!-- Closing Date History Table -->
-      <div style="margin-top: 16px;">
-        <strong style="font-size: 0.85rem; color: var(--text-muted);">Observed Deadline Changes:</strong>
-        {% if closing_history %}
-          <table class="history-table">
+      <!-- Vertical Timeline: Deadline History -->
+      <div class="detail-card">
+        <div class="detail-card-title">Deadline history</div>
+        <div class="timeline">
+          <!-- 1. Original Deadline -->
+          <div class="timeline-node">
+            <div class="timeline-dot"></div>
+            <div class="timeline-date">{{ tender.original_end_ist or tender.closing_ist }}</div>
+            <div class="timeline-desc">Original deadline from the PDF{% if tender.original_end_utc %} ({{ tender.original_end_utc }}){% endif %}</div>
+          </div>
+
+          <!-- Closing History Shifts (if any) -->
+          {% if closing_history %}
+            {% for ch in closing_history %}
+              <div class="timeline-node">
+                <div class="timeline-dot"></div>
+                <div class="timeline-date">{{ ch.new_value }}</div>
+                <div class="timeline-desc">Observed shift from {{ ch.old_value }} (at {{ ch.seen_at }})</div>
+              </div>
+            {% endfor %}
+          {% endif %}
+
+          <!-- 2. Live Deadline -->
+          <div class="timeline-node">
+            <div class="timeline-dot active"></div>
+            <div class="timeline-date">{{ tender.closing_ist }}</div>
+            <div class="timeline-desc">
+              Live deadline
+              {% if tender.date_check == 'extended_by_corrigendum' %}
+                (extended by Corrigendum)
+              {% elif tender.date_check == 'extended_auto' %}
+                (auto-extended)
+              {% elif tender.is_extended %}
+                (extended)
+              {% else %}
+                (unchanged)
+              {% endif %}
+              {% if tender.closing_date %} ({{ tender.closing_date }}){% endif %}
+            </div>
+          </div>
+
+          <!-- 3. Auto Limit -->
+          {% if tender.auto_extension_limit_ist %}
+            <div class="timeline-node">
+              <div class="timeline-dot limit"></div>
+              <div class="timeline-date">{{ tender.auto_extension_limit_ist }}</div>
+              <div class="timeline-desc">
+                Auto limit: extensions beyond this are not trusted{% if tender.auto_extension_limit_utc %} ({{ tender.auto_extension_limit_utc }}){% endif %}
+              </div>
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="kv-grid" style="margin-top: 12px; border-top: 1px solid var(--border-subtle); padding-top: 10px;">
+          <div class="kv-label">Date Check</div>
+          <div class="kv-val"><code>{{ tender.date_check }}</code></div>
+
+          <div class="kv-label">Extensions Seen</div>
+          <div class="kv-val">{{ tender.extensions_seen }} (observed by refresh)</div>
+
+          {% if tender.corrigendum_date %}
+            <div class="kv-label">Corrigendum Date</div>
+            <div class="kv-val" style="color: var(--warning);">{{ tender.corrigendum_date }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Why it Scored Section -->
+      <div class="detail-card">
+        <div class="detail-card-title">Why it scored {{ tender.relevance_score }}</div>
+        <div class="kv-grid">
+          <div class="kv-label">Match Basis</div>
+          <div class="kv-val">
+            {{ tender.match_basis }}
+            {% if tender.match_basis == 'location_only' %}
+              <span class="badge" style="background: #fef3c7; color: #92400e; border-color: #fde68a; font-size: 0.72rem; margin-left: 4px;">location only</span>
+            {% endif %}
+          </div>
+
+          <div class="kv-label">Matched Terms</div>
+          <div class="kv-val">
+            {% if tender.matched_terms %}
+              <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                {% for term in tender.matched_terms.split(',') %}
+                  <span class="chip-tag">{{ term.strip() }}</span>
+                {% endfor %}
+              </div>
+            {% else %}
+              None
+            {% endif %}
+          </div>
+
+          <div class="kv-label">Eligibility Flags</div>
+          <div class="kv-val">
+            {% if flags %}
+              <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                {% for flag in flags %}
+                  <span class="chip-flag">{{ flag }}</span>
+                {% endfor %}
+              </div>
+            {% else %}
+              None
+            {% endif %}
+          </div>
+
+          <div class="kv-label">Eligibility Assessment</div>
+          <div class="kv-val">
+            <strong>{{ tender.eligibility }}</strong>
+            {% if eligibility_reasons %}
+              <ul style="margin-left: 18px; margin-top: 4px; color: var(--text-muted); font-size: 0.8rem;">
+                {% for reason in eligibility_reasons %}
+                  <li>{{ reason }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Enriched PDF Details -->
+      <div class="detail-card">
+        <div class="detail-card-title">📋 Enriched PDF Details</div>
+
+        {% if tender.buyer_overrides_gem_fields %}
+          <div class="notice-banner notice-danger">
+            <span>⚠️</span>
+            <div><strong>Notice:</strong> EMD / turnover set in buyer documents, check them before relying on these numbers</div>
+          </div>
+        {% endif %}
+
+        {% if tender.category_noise_reason %}
+          <div class="notice-banner notice-warning">
+            <span>⚠️</span>
+            <div><strong>Notice:</strong> Buyer category suggests this is not a product or equipment lead: {{ tender.category_noise_reason }}</div>
+          </div>
+        {% endif %}
+
+        {% if tender.buyer_match %}
+          <div class="notice-banner notice-success">
+            <span>🏷️</span>
+            <div><strong>Notice:</strong> Oil/gas buyer, supply tender (Verified oil/gas buyer supply tender placed in Tier B)</div>
+          </div>
+        {% endif %}
+
+        <div class="kv-grid">
+          <div class="kv-label">Bid Number</div>
+          <div class="kv-val">{{ tender.bid_number or 'N/A' }}</div>
+
+          <div class="kv-label">Item Category</div>
+          <div class="kv-val">{{ tender.item_category or tender.category or 'N/A' }}</div>
+
+          {% if tender.similar_category %}
+            <div class="kv-label">Similar Category</div>
+            <div class="kv-val">{{ tender.similar_category }}</div>
+          {% endif %}
+
+          {% if tender.category_noise_reason %}
+            <div class="kv-label">Category Noise</div>
+            <div class="kv-val" style="color: var(--warning);">{{ tender.category_noise_reason }}</div>
+          {% endif %}
+
+          <div class="kv-label">Estimated Value</div>
+          <div class="kv-val">
+            {% if tender.estimated_bid_value_inr %}
+              ₹{{ "{:,.2f}".format(tender.estimated_bid_value_inr) }}
+            {% elif tender.floor_price_inr_min or tender.floor_price_inr_max %}
+              {% if tender.floor_price_inr_min == tender.floor_price_inr_max %}
+                ₹{{ "{:,.2f}".format(tender.floor_price_inr_min) }}
+              {% else %}
+                ₹{{ "{:,.2f}".format(tender.floor_price_inr_min or 0) }} - ₹{{ "{:,.2f}".format(tender.floor_price_inr_max or 0) }}
+              {% endif %}
+              {% if tender.floor_price_schedules %}
+                <div style="margin-top: 4px; font-size: 0.75rem; color: var(--text-muted);">
+                  Schedules:
+                  {% for sch in tender.floor_price_schedules %}
+                    {{ sch.schedule }}: ₹{{ "{:,.2f}".format(sch.amount) }}{% if not loop.last %}, {% endif %}
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% else %}
+              Not Stated
+            {% endif %}
+          </div>
+
+          <div class="kv-label">Quantity</div>
+          <div class="kv-val">{{ tender.total_quantity or 'N/A' }}</div>
+
+          <div class="kv-label">EMD Details</div>
+          <div class="kv-val">
+            {% if tender.emd_amount_inr %}
+              ₹{{ "{:,.0f}".format(tender.emd_amount_inr) }}
+            {% elif tender.emd_amount_inr_min or tender.emd_amount_inr_max %}
+              ₹{{ "{:,.0f}".format(tender.emd_amount_inr_min or 0) }} - ₹{{ "{:,.0f}".format(tender.emd_amount_inr_max or 0) }}
+            {% elif tender.emd_value %}
+              {{ tender.emd_value }}
+            {% else %}
+              Nil / Exempt
+            {% endif %}
+            {% if tender.buyer_overrides_gem_fields %}
+              <span class="badge" style="background: #fee2e2; color: #991b1b; font-size: 0.7rem; margin-left: 4px;">Buyer documents override GeM values</span>
+            {% endif %}
+            {% if tender.emd_schedules %}
+              <div style="margin-top: 4px; font-size: 0.75rem; color: var(--text-muted);">
+                Schedules:
+                {% for sch in tender.emd_schedules %}
+                  {{ sch.schedule }}: ₹{{ "{:,.0f}".format(sch.amount) }}{% if not loop.last %}, {% endif %}
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="kv-label">ePBG Required</div>
+          <div class="kv-val">
+            {% if tender.epbg_required %}
+              Yes ({{ tender.epbg_percent }}%, {{ tender.epbg_months }} months)
+              {% if tender.pbg_months_per_lot %}
+                <div style="margin-top: 4px; font-size: 0.75rem; color: var(--text-muted);">
+                  Lot-wise PBG duration:
+                  {% for p in tender.pbg_months_per_lot %}
+                    {{ p.lot }}: {{ p.months }} months{% if not loop.last %}, {% endif %}
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% else %}
+              No
+            {% endif %}
+          </div>
+
+          <div class="kv-label">MSE Reserved</div>
+          <div class="kv-val">{{ 'Yes' if tender.mse_reserved else 'No' }}</div>
+
+          <div class="kv-label">MII Restriction</div>
+          <div class="kv-val">{{ tender.mii_class_restriction or 'None' }}</div>
+
+          <div class="kv-label">BIS Required</div>
+          <div class="kv-val">{{ 'Yes' if tender.bis_required == 1 else ('No' if tender.bis_required == 0 else 'Not Stated') }}</div>
+
+          <div class="kv-label">Min Turnover</div>
+          <div class="kv-val">
+            {% if tender.min_turnover_lakh %}
+              {{ tender.min_turnover_lakh }} Lakhs
+            {% else %}
+              Not Stated
+            {% endif %}
+          </div>
+
+          <div class="kv-label">Experience</div>
+          <div class="kv-val">
+            {% if tender.years_experience_required %}
+              {{ tender.years_experience_required }} Years
+            {% else %}
+              Not Stated
+            {% endif %}
+          </div>
+
+          <div class="kv-label">Auto-Extension</div>
+          <div class="kv-val">
+            {% if tender.auto_extend_days and tender.auto_extend_max_count %}
+              {{ tender.auto_extend_days }} days × {{ tender.auto_extend_max_count }} times (Min bids: {{ tender.auto_extend_min_bids or 'N/A' }})
+            {% else %}
+              Not Configured / None
+            {% endif %}
+          </div>
+
+          <div class="kv-label">Consignee City</div>
+          <div class="kv-val">{{ tender.consignee_city or 'Not Stated' }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Management Form & Status History -->
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <!-- Update Form Card -->
+      <div class="detail-card">
+        <div class="detail-card-title">⚙️ Update Status & Owner</div>
+        <form method="post" action="/tenders/{{ tender.id }}/update" class="status-form-group">
+          <!-- Status Radio Buttons -->
+          <div>
+            <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px;">
+              Workflow Status
+            </label>
+            <div class="status-pills">
+              {% for s in ['new', 'interested', 'bidding', 'skipped', 'submitted'] %}
+                <label>
+                  <input type="radio" name="status" value="{{ s }}" class="status-radio" {% if tender.status == s %}checked{% endif %}>
+                  <span class="status-pill-btn">{{ s }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Owner Select -->
+          <div>
+            <label for="owner" style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px;">
+              Owner / Assignee
+            </label>
+            <select id="owner" name="owner" style="width: 100%;">
+              <option value="">-- Unassigned --</option>
+              {% for o in owners %}
+                <option value="{{ o }}" {% if tender.owner == o %}selected{% endif %}>{{ o }}</option>
+              {% endfor %}
+              {% if tender.owner and tender.owner not in owners %}
+                <option value="{{ tender.owner }}" selected>{{ tender.owner }}</option>
+              {% endif %}
+            </select>
+          </div>
+
+          <!-- Notes Textarea -->
+          <div>
+            <label for="notes" style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px;">
+              Internal Notes
+            </label>
+            <textarea id="notes" name="notes" rows="4" style="width: 100%;" placeholder="Add bidding notes, action items, or remarks...">{{ tender.notes or '' }}</textarea>
+          </div>
+
+          <button type="submit" class="btn" style="width: 100%;">Save Changes</button>
+        </form>
+      </div>
+
+      <!-- Status History Card -->
+      <div class="detail-card">
+        <div class="detail-card-title">📜 Status History</div>
+        {% if status_history %}
+          <table class="history-tbl">
             <thead>
               <tr>
-                <th>Old Value (UTC)</th>
-                <th>New Value (UTC)</th>
-                <th>Observed At (UTC)</th>
+                <th>Shift</th>
+                <th>Owner</th>
+                <th>Changed At</th>
               </tr>
             </thead>
             <tbody>
-              {% for ch in closing_history %}
+              {% for sh in status_history %}
               <tr>
-                <td>{{ ch.old_value }}</td>
-                <td style="color: #4ade80;">{{ ch.new_value }}</td>
-                <td>{{ ch.seen_at }}</td>
+                <td>
+                  <span style="color: var(--text-muted);">{{ sh.old_status or 'none' }}</span> →
+                  <strong style="color: var(--primary);">{{ sh.new_status }}</strong>
+                </td>
+                <td>{{ sh.owner or '-' }}</td>
+                <td>{{ sh.changed_at }}</td>
               </tr>
               {% endfor %}
             </tbody>
           </table>
         {% else %}
-          <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">No deadline shifts recorded yet.</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">No status transitions recorded yet.</div>
         {% endif %}
       </div>
-    </div>
-
-    <!-- Enriched GeM Fields Card -->
-    <div class="card">
-      <div class="card-title">📋 Enriched PDF Details</div>
-
-      {% if tender.buyer_overrides_gem_fields %}
-        <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; border-radius: 6px; padding: 12px; margin-bottom: 16px; color: #fca5a5; display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 1.2rem;">⚠️</span>
-          <div>
-            <strong>Notice:</strong> EMD / turnover set in buyer documents, check them before relying on these numbers
-          </div>
-        </div>
-      {% endif %}
-
-      {% if tender.category_noise_reason %}
-        <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; border-radius: 6px; padding: 12px; margin-bottom: 16px; color: #fde68a; display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 1.2rem;">⚠️</span>
-          <div>
-            <strong>Notice:</strong> Buyer category suggests this is not a product or equipment lead: {{ tender.category_noise_reason }}
-          </div>
-        </div>
-      {% endif %}
-
-      {% if tender.buyer_match %}
-        <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; border-radius: 6px; padding: 12px; margin-bottom: 16px; color: #a7f3d0; display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 1.2rem;">🏷️</span>
-          <div>
-            <strong>Notice:</strong> Oil/gas buyer, supply tender (Verified oil/gas buyer supply tender placed in Tier B)
-          </div>
-        </div>
-      {% endif %}
-
-      <div class="data-grid">
-        <div class="data-label">Bid Number</div>
-        <div class="data-value">{{ tender.bid_number or 'N/A' }}</div>
-
-        <div class="data-label">Item Category</div>
-        <div class="data-value">{{ tender.item_category or tender.category or 'N/A' }}</div>
-
-        {% if tender.similar_category %}
-          <div class="data-label">Similar Category</div>
-          <div class="data-value">{{ tender.similar_category }}</div>
-        {% endif %}
-
-        {% if tender.category_noise_reason %}
-          <div class="data-label">Category Noise</div>
-          <div class="data-value" style="color: #f59e0b;">{{ tender.category_noise_reason }}</div>
-        {% endif %}
-
-        {% if tender.estimated_bid_value_inr %}
-          <div class="data-label">Estimated Value</div>
-          <div class="data-value">₹{{ "{:,.2f}".format(tender.estimated_bid_value_inr) }}</div>
-        {% elif tender.floor_price_inr_min or tender.floor_price_inr_max %}
-          <div class="data-label">Floor Price</div>
-          <div class="data-value">
-            {% if tender.floor_price_inr_min == tender.floor_price_inr_max %}
-              ₹{{ "{:,.2f}".format(tender.floor_price_inr_min) }}
-            {% else %}
-              ₹{{ "{:,.2f}".format(tender.floor_price_inr_min or 0) }} - ₹{{ "{:,.2f}".format(tender.floor_price_inr_max or 0) }}
-            {% endif %}
-            {% if tender.floor_price_schedules %}
-              <div style="margin-top: 4px; font-size: 0.8rem; color: var(--text-muted);">
-                Schedules:
-                {% for sch in tender.floor_price_schedules %}
-                  {{ sch.schedule }}: ₹{{ "{:,.2f}".format(sch.amount) }}{% if not loop.last %}, {% endif %}
-                {% endfor %}
-              </div>
-            {% endif %}
-          </div>
-        {% else %}
-          <div class="data-label">Estimated Value</div>
-          <div class="data-value">Not Stated</div>
-        {% endif %}
-
-        <div class="data-label">Quantity</div>
-        <div class="data-value">{{ tender.total_quantity or 'N/A' }}</div>
-
-        <div class="data-label">EMD Details</div>
-        <div class="data-value">
-          {% if tender.emd_amount_inr %}
-            ₹{{ "{:,.0f}".format(tender.emd_amount_inr) }}
-          {% elif tender.emd_amount_inr_min or tender.emd_amount_inr_max %}
-            ₹{{ "{:,.0f}".format(tender.emd_amount_inr_min or 0) }} - ₹{{ "{:,.0f}".format(tender.emd_amount_inr_max or 0) }}
-          {% else %}
-            Nil / Exempt
-          {% endif %}
-          {% if tender.buyer_overrides_gem_fields %}
-            <span class="badge" style="background: #7f1d1d; color: #fca5a5; font-size: 0.72rem; margin-left: 6px;">Buyer documents override GeM values</span>
-          {% endif %}
-          {% if tender.emd_schedules %}
-            <div style="margin-top: 4px; font-size: 0.8rem; color: var(--text-muted);">
-              Schedules:
-              {% for sch in tender.emd_schedules %}
-                {{ sch.schedule }}: ₹{{ "{:,.0f}".format(sch.amount) }}{% if not loop.last %}, {% endif %}
-              {% endfor %}
-            </div>
-          {% endif %}
-        </div>
-
-        <div class="data-label">ePBG Required</div>
-        <div class="data-value">
-          {% if tender.epbg_required %}
-            Yes ({{ tender.epbg_percent }}%, {{ tender.epbg_months }} months)
-            {% if tender.pbg_months_per_lot %}
-              <div style="margin-top: 4px; font-size: 0.8rem; color: var(--text-muted);">
-                Lot-wise PBG duration:
-                {% for p in tender.pbg_months_per_lot %}
-                  {{ p.lot }}: {{ p.months }} months{% if not loop.last %}, {% endif %}
-                {% endfor %}
-              </div>
-            {% endif %}
-          {% else %}
-            No
-          {% endif %}
-        </div>
-
-        <div class="data-label">MSE Reserved</div>
-        <div class="data-value">{{ 'Yes' if tender.mse_reserved else 'No' }}</div>
-
-        <div class="data-label">MII Restriction</div>
-        <div class="data-value">{{ tender.mii_class_restriction or 'None' }}</div>
-
-        <div class="data-label">BIS Required</div>
-        <div class="data-value">{{ 'Yes' if tender.bis_required == 1 else ('No' if tender.bis_required == 0 else 'Not Stated') }}</div>
-
-        <div class="data-label">Min Turnover</div>
-        <div class="data-value">
-          {% if tender.min_turnover_lakh %}
-            {{ tender.min_turnover_lakh }} Lakhs
-          {% else %}
-            Not Stated
-          {% endif %}
-        </div>
-
-        <div class="data-label">Experience</div>
-        <div class="data-value">
-          {% if tender.years_experience_required %}
-            {{ tender.years_experience_required }} Years
-          {% else %}
-            Not Stated
-          {% endif %}
-        </div>
-
-        <div class="data-label">Auto-Extension</div>
-        <div class="data-value">
-          {% if tender.auto_extend_days and tender.auto_extend_max_count %}
-            {{ tender.auto_extend_days }} days × {{ tender.auto_extend_max_count }} times (Min bids: {{ tender.auto_extend_min_bids or 'N/A' }})
-          {% else %}
-            Not Configured / None
-          {% endif %}
-        </div>
-
-        <div class="data-label">Consignee City</div>
-        <div class="data-value">{{ tender.consignee_city or 'Not Stated' }}</div>
-      </div>
-    </div>
-
-    <!-- Match Terms & Scoring Points Card -->
-    <div class="card">
-      <div class="card-title">🎯 Matched Terms & Scoring</div>
-      <div class="data-grid">
-        <div class="data-label">Total Score</div>
-        <div class="data-value"><strong style="color: #38bdf8;">{{ tender.relevance_score }} / 100</strong></div>
-
-        <div class="data-label">Match Basis</div>
-        <div class="data-value">
-              {{ tender.match_basis }}
-              {% if tender.match_basis == 'location_only' %}
-                <span class="badge" style="background: #78350f; color: #fde68a; border: 1px solid #d97706; font-size: 0.72rem; margin-left: 6px;">location only</span>
-              {% endif %}
-            </div>
-
-        <div class="data-label">Matched Terms</div>
-        <div class="data-value">
-          {% if tender.matched_terms %}
-            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-              {% for term in tender.matched_terms.split(',') %}
-                <span style="background: #0f172a; border: 1px solid #334155; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">
-                  {{ term.strip() }}
-                </span>
-              {% endfor %}
-            </div>
-          {% else %}
-            None
-          {% endif %}
-        </div>
-
-        <div class="data-label">Eligibility Flags</div>
-        <div class="data-value">
-          {% if flags %}
-            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-              {% for flag in flags %}
-                <span style="background: #312e81; color: #c7d2fe; padding: 2px 8px; border-radius: 4px; font-size: 0.82rem;">
-                  {{ flag }}
-                </span>
-              {% endfor %}
-            </div>
-          {% else %}
-            None
-          {% endif %}
-        </div>
-
-        <div class="data-label">Eligibility Assessment</div>
-        <div class="data-value">
-          <strong>{{ tender.eligibility }}</strong>
-          {% if eligibility_reasons %}
-            <ul style="margin-left: 20px; margin-top: 4px; color: var(--text-muted); font-size: 0.85rem;">
-              {% for reason in eligibility_reasons %}
-                <li>{{ reason }}</li>
-              {% endfor %}
-            </ul>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Right Column: Status, Owner, Notes Management & History -->
-  <div>
-    <div class="card">
-      <div class="card-title">⚙️ Update Status & Owner</div>
-      <form method="post" action="/tenders/{{ tender.id }}/update" class="status-form">
-        <!-- Status Buttons -->
-        <div>
-          <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px;">
-            Workflow Status
-          </label>
-          <div class="btn-group">
-            {% for s in ['new', 'interested', 'bidding', 'skipped', 'submitted'] %}
-              <label>
-                <input type="radio" name="status" value="{{ s }}" class="status-radio" {% if tender.status == s %}checked{% endif %}>
-                <span class="status-btn">{{ s }}</span>
-              </label>
-            {% endfor %}
-          </div>
-        </div>
-
-        <!-- Owner Dropdown -->
-        <div>
-          <label for="owner" style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px;">
-            Owner / Assignee
-          </label>
-          <select id="owner" name="owner" style="width: 100%;">
-            <option value="">-- Unassigned --</option>
-            {% for o in owners %}
-              <option value="{{ o }}" {% if tender.owner == o %}selected{% endif %}>{{ o }}</option>
-            {% endfor %}
-            {% if tender.owner and tender.owner not in owners %}
-              <option value="{{ tender.owner }}" selected>{{ tender.owner }}</option>
-            {% endif %}
-          </select>
-        </div>
-
-        <!-- Notes Box -->
-        <div>
-          <label for="notes" style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px;">
-            Internal Notes
-          </label>
-          <textarea id="notes" name="notes" rows="4" style="width: 100%;" placeholder="Add bidding notes, action items, or remarks...">{{ tender.notes or '' }}</textarea>
-        </div>
-
-        <button type="submit" style="width: 100%;">Save Changes</button>
-      </form>
-    </div>
-
-    <!-- Status History Card -->
-    <div class="card">
-      <div class="card-title">📜 Status History</div>
-      {% if status_history %}
-        <table class="history-table">
-          <thead>
-            <tr>
-              <th>Status Shift</th>
-              <th>Owner</th>
-              <th>Changed At</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for sh in status_history %}
-            <tr>
-              <td>
-                <span style="color: var(--text-muted);">{{ sh.old_status or 'none' }}</span> →
-                <strong style="color: #60a5fa;">{{ sh.new_status }}</strong>
-              </td>
-              <td>{{ sh.owner or '-' }}</td>
-              <td>{{ sh.changed_at }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      {% else %}
-        <div style="font-size: 0.85rem; color: var(--text-muted);">No status transitions recorded yet.</div>
-      {% endif %}
     </div>
   </div>
 </div>
 {% endblock %}
+
