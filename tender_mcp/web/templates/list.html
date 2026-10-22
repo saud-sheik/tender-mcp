@@ -206,7 +206,12 @@
   .tender-card-item.selected {
     border-color: var(--primary);
     border-left: 4px solid var(--primary);
-    background: var(--primary-tint);
+    background: rgba(31, 122, 92, 0.08);
+  }
+  [data-theme="dark"] .tender-card-item.selected {
+    border-color: var(--primary);
+    border-left: 4px solid var(--primary);
+    background: rgba(34, 197, 94, 0.15);
   }
 
   /* Circular Score Ring */
@@ -315,6 +320,295 @@
     text-align: center;
     color: var(--text-muted);
     font-size: 0.9rem;
+  }
+
+  /* Scoped Detail Preview Styles inside Preview Pane */
+  #tender-detail-content.detail-container,
+  #detail-preview-container .detail-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  #tender-detail-content .standalone-grid,
+  #detail-preview-container .standalone-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  #tender-detail-content .detail-card,
+  #detail-preview-container .detail-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    box-shadow: var(--shadow-sm);
+  }
+  #tender-detail-content .detail-card-title,
+  #detail-preview-container .detail-card-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  #tender-detail-content .detail-chips-row,
+  #detail-preview-container .detail-chips-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  #tender-detail-content .detail-main-title,
+  #detail-preview-container .detail-main-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.35;
+    margin-bottom: 6px;
+  }
+  #tender-detail-content .detail-org-name,
+  #detail-preview-container .detail-org-name {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+  #tender-detail-content .deadline-hero,
+  #detail-preview-container .deadline-hero {
+    background: var(--primary-tint);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 14px 0 16px 0;
+  }
+  #tender-detail-content .hero-days-val,
+  #detail-preview-container .hero-days-val {
+    font-size: 1.85rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--primary);
+    white-space: nowrap;
+  }
+  #tender-detail-content .hero-days-val.urgent,
+  #detail-preview-container .hero-days-val.urgent { color: var(--danger); }
+  #tender-detail-content .hero-days-val.soon,
+  #detail-preview-container .hero-days-val.soon { color: var(--warning); }
+  #tender-detail-content .hero-meta,
+  #detail-preview-container .hero-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  #tender-detail-content .hero-closing-date,
+  #detail-preview-container .hero-closing-date {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+  #tender-detail-content .hero-closing-label,
+  #detail-preview-container .hero-closing-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  #tender-detail-content .timeline,
+  #detail-preview-container .timeline {
+    position: relative;
+    padding-left: 20px;
+    margin: 8px 0 14px 0;
+  }
+  #tender-detail-content .timeline::before,
+  #detail-preview-container .timeline::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    left: 6px;
+    width: 2px;
+    background: var(--border);
+  }
+  #tender-detail-content .timeline-node,
+  #detail-preview-container .timeline-node {
+    position: relative;
+    margin-bottom: 14px;
+  }
+  #tender-detail-content .timeline-node:last-child,
+  #detail-preview-container .timeline-node:last-child {
+    margin-bottom: 0;
+  }
+  #tender-detail-content .timeline-dot,
+  #detail-preview-container .timeline-dot {
+    position: absolute;
+    left: -20px;
+    top: 4px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--card-bg);
+    border: 2px solid var(--border);
+  }
+  #tender-detail-content .timeline-dot.active,
+  #detail-preview-container .timeline-dot.active {
+    background: var(--primary);
+    border-color: var(--primary);
+  }
+  #tender-detail-content .timeline-dot.limit,
+  #detail-preview-container .timeline-dot.limit {
+    border-style: dashed;
+    border-color: var(--text-muted);
+  }
+  #tender-detail-content .timeline-date,
+  #detail-preview-container .timeline-date {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+  #tender-detail-content .timeline-desc,
+  #detail-preview-container .timeline-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 1px;
+  }
+  #tender-detail-content .kv-grid,
+  #detail-preview-container .kv-grid {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 8px 12px;
+    font-size: 0.82rem;
+  }
+  #tender-detail-content .kv-label,
+  #detail-preview-container .kv-label {
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  #tender-detail-content .kv-val,
+  #detail-preview-container .kv-val {
+    color: var(--text);
+    word-break: break-word;
+  }
+  #tender-detail-content .notice-banner,
+  #detail-preview-container .notice-banner {
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #tender-detail-content .notice-danger,
+  #detail-preview-container .notice-danger {
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+  }
+  #tender-detail-content .notice-warning,
+  #detail-preview-container .notice-warning {
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    color: #92400e;
+  }
+  #tender-detail-content .notice-success,
+  #detail-preview-container .notice-success {
+    background: #e8f5e9;
+    border: 1px solid #c8e6c9;
+    color: #1e7e34;
+  }
+  [data-theme="dark"] #tender-detail-content .notice-danger,
+  [data-theme="dark"] #detail-preview-container .notice-danger { background: #450a0a; border-color: #7f1d1d; color: #fecaca; }
+  [data-theme="dark"] #tender-detail-content .notice-warning,
+  [data-theme="dark"] #detail-preview-container .notice-warning { background: #451a03; border-color: #78350f; color: #fde68a; }
+  [data-theme="dark"] #tender-detail-content .notice-success,
+  [data-theme="dark"] #detail-preview-container .notice-success { background: #064e3b; border-color: #047857; color: #a7f3d0; }
+
+  #tender-detail-content .chip-tag,
+  #detail-preview-container .chip-tag {
+    display: inline-block;
+    background: var(--card-subtle);
+    border: 1px solid var(--border);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    color: var(--text);
+  }
+  #tender-detail-content .chip-flag,
+  #detail-preview-container .chip-flag {
+    display: inline-block;
+    background: #e0e7ff;
+    border: 1px solid #c7d2fe;
+    color: #3730a3;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+  }
+  [data-theme="dark"] #tender-detail-content .chip-flag,
+  [data-theme="dark"] #detail-preview-container .chip-flag {
+    background: #312e81;
+    border-color: #4338ca;
+    color: #c7d2fe;
+  }
+  #tender-detail-content .status-form-group,
+  #detail-preview-container .status-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  #tender-detail-content .status-pills,
+  #detail-preview-container .status-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  #tender-detail-content .status-radio,
+  #detail-preview-container .status-radio {
+    display: none;
+  }
+  #tender-detail-content .status-pill-btn,
+  #detail-preview-container .status-pill-btn {
+    padding: 5px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card-bg);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: capitalize;
+    transition: all 0.15s ease;
+  }
+  #tender-detail-content .status-pill-btn:hover,
+  #detail-preview-container .status-pill-btn:hover {
+    border-color: var(--primary);
+  }
+  #tender-detail-content .status-radio:checked + .status-pill-btn,
+  #detail-preview-container .status-radio:checked + .status-pill-btn {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #ffffff;
+  }
+  #tender-detail-content .history-tbl,
+  #detail-preview-container .history-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+    margin-top: 6px;
+  }
+  #tender-detail-content .history-tbl th,
+  #tender-detail-content .history-tbl td,
+  #detail-preview-container .history-tbl th,
+  #detail-preview-container .history-tbl td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+  }
+  #tender-detail-content .history-tbl th,
+  #detail-preview-container .history-tbl th {
+    color: var(--text-muted);
+    font-weight: 600;
   }
 
   .empty-state-card {
@@ -448,8 +742,8 @@
       <div class="filter-item">
         <label for="client-sort">Sort</label>
         <select id="client-sort" onchange="sortTendersList(this.value)">
+          <option value="score_desc" selected>Score high→low</option>
           <option value="closing_soonest">Closing soonest</option>
-          <option value="score_desc">Score high→low</option>
           <option value="emd_asc">EMD low→high</option>
         </select>
       </div>
@@ -692,16 +986,26 @@
     for (var i = 0; i < rows.length; i++) {
       container.appendChild(rows[i]);
     }
+
+    var firstRow = container.querySelector('.tender-card-item');
+    if (firstRow) {
+      var href = firstRow.getAttribute('data-href');
+      if (href && window.innerWidth >= 1000) {
+        loadDetailPreview(href, firstRow);
+      } else {
+        var allRows = document.querySelectorAll('.tender-card-item');
+        for (var j = 0; j < allRows.length; j++) {
+          allRows[j].classList.remove('selected');
+        }
+        firstRow.classList.add('selected');
+      }
+    }
   }
 
   document.addEventListener('DOMContentLoaded', function() {
-    var firstRow = document.querySelector('.tender-card-item');
-    if (firstRow && window.innerWidth >= 1000) {
-      var href = firstRow.getAttribute('data-href');
-      if (href) {
-        loadDetailPreview(href, firstRow);
-      }
-    }
+    var sortSelect = document.getElementById('client-sort');
+    var initialMode = (sortSelect && sortSelect.value) ? sortSelect.value : 'score_desc';
+    sortTendersList(initialMode);
   });
 </script>
 {% endblock %}
