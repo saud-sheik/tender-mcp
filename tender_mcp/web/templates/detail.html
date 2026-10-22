@@ -406,6 +406,7 @@
               {% else %}
                 (unchanged)
               {% endif %}
+              {% if tender.closing_date %} ({{ tender.closing_date }}){% endif %}
             </div>
           </div>
 
@@ -414,7 +415,9 @@
             <div class="timeline-node">
               <div class="timeline-dot limit"></div>
               <div class="timeline-date">{{ tender.auto_extension_limit_ist }}</div>
-              <div class="timeline-desc">Auto limit: extensions beyond this are not trusted</div>
+              <div class="timeline-desc">
+                Auto limit: extensions beyond this are not trusted{% if tender.auto_extension_limit_utc %} ({{ tender.auto_extension_limit_utc }}){% endif %}
+              </div>
             </div>
           {% endif %}
         </div>
