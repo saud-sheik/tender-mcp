@@ -206,7 +206,12 @@
   .tender-card-item.selected {
     border-color: var(--primary);
     border-left: 4px solid var(--primary);
-    background: var(--primary-tint);
+    background: rgba(31, 122, 92, 0.08);
+  }
+  [data-theme="dark"] .tender-card-item.selected {
+    border-color: var(--primary);
+    border-left: 4px solid var(--primary);
+    background: rgba(34, 197, 94, 0.15);
   }
 
   /* Circular Score Ring */
@@ -737,8 +742,8 @@
       <div class="filter-item">
         <label for="client-sort">Sort</label>
         <select id="client-sort" onchange="sortTendersList(this.value)">
+          <option value="score_desc" selected>Score high→low</option>
           <option value="closing_soonest">Closing soonest</option>
-          <option value="score_desc">Score high→low</option>
           <option value="emd_asc">EMD low→high</option>
         </select>
       </div>
@@ -975,16 +980,26 @@
     for (var i = 0; i < rows.length; i++) {
       container.appendChild(rows[i]);
     }
+
+    var firstRow = container.querySelector('.tender-card-item');
+    if (firstRow) {
+      var href = firstRow.getAttribute('data-href');
+      if (href && window.innerWidth >= 1000) {
+        loadDetailPreview(href, firstRow);
+      } else {
+        var allRows = document.querySelectorAll('.tender-card-item');
+        for (var j = 0; j < allRows.length; j++) {
+          allRows[j].classList.remove('selected');
+        }
+        firstRow.classList.add('selected');
+      }
+    }
   }
 
   document.addEventListener('DOMContentLoaded', function() {
-    var firstRow = document.querySelector('.tender-card-item');
-    if (firstRow && window.innerWidth >= 1000) {
-      var href = firstRow.getAttribute('data-href');
-      if (href) {
-        loadDetailPreview(href, firstRow);
-      }
-    }
+    var sortSelect = document.getElementById('client-sort');
+    var initialMode = (sortSelect && sortSelect.value) ? sortSelect.value : 'score_desc';
+    sortTendersList(initialMode);
   });
 </script>
 {% endblock %}
