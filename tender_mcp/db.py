@@ -32,6 +32,7 @@ def get_conn() -> Generator[sqlite3.Connection, None, None]:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA foreign_keys=ON;")
+        conn.executescript(TABLES_SCHEMA)
         _local.conn = conn
     yield _local.conn
 

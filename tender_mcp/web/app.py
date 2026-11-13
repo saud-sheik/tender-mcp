@@ -49,6 +49,7 @@ from tender_mcp.db import (
     get_conn,
     get_tender_by_id,
     get_tender_status_history,
+    init_db,
     update_tender_status,
     toggle_tender_watched,
     set_tender_watched,
@@ -58,7 +59,9 @@ from tender_mcp.matcher import compute_bid_window, is_single_tender, check_mr_ti
 
 logger = logging.getLogger(__name__)
 
-# Verify credentials on module load / startup
+# Initialize DB tables and verify credentials on startup
+init_db()
+
 USER, PASSWORD = get_dashboard_credentials()
 if not USER or not PASSWORD:
     raise RuntimeError(
@@ -67,6 +70,7 @@ if not USER or not PASSWORD:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_db()
     global _auto_refresh_task
     _auto_refresh_task = asyncio.create_task(_background_scheduler_loop())
     yield
