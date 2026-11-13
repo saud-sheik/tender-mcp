@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: tender-mcp
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    dockerfilePath: Dockerfile
+    healthCheckPath: /healthz
+    envVars:
+      - key: DASHBOARD_USER
+        sync: false
+      - key: DASHBOARD_PASSWORD
+        generateValue: true
+      - key: HEADLESS
+        value: "true"
+      - key: AUTO_REFRESH_INTERVAL_MINUTES
+        value: "180"
+      - key: HMEL_USERNAME
+        sync: false
+      - key: HMEL_PASSWORD
+        sync: false
+      - key: SLACK_WEBHOOK_URL
+        sync: false

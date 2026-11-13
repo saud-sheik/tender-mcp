@@ -275,6 +275,12 @@ def query_filtered_tenders(
     return results
 
 
+@app.get("/healthz")
+def healthz() -> dict[str, str]:
+    """Lightweight liveness probe for container orchestrators (Render, Docker, Kubernetes)."""
+    return {"status": "ok"}
+
+
 @app.get("/health")
 def health_endpoint() -> JSONResponse:
     """Return 200 only if the last successful refresh is under 6 hours old, else 503."""
