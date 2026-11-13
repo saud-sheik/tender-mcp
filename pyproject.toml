@@ -31,6 +31,10 @@ dev = [
 [project.scripts]
 tender-refresh = "scripts.refresh:main"
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tender_mcp*", "scrapers*"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
