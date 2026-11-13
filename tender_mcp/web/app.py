@@ -386,12 +386,13 @@ def login_page(
     if token and verify_session_token(token):
         return RedirectResponse(url=next if (next and next.startswith("/")) else "/", status_code=status.HTTP_303_SEE_OTHER)
 
-    current_user, _ = get_dashboard_credentials()
+    current_user, current_pw = get_dashboard_credentials()
     template = jinja_env.get_template("login.html")
     rendered = template.render(
         next_url=next or "/",
         error=error,
         configured_user=current_user,
+        configured_password=current_pw,
         username=request.query_params.get("username", ""),
     )
     return HTMLResponse(rendered)
@@ -415,6 +416,7 @@ def login_post(
             next_url=next or "/",
             error="Invalid username or password. Please try again.",
             configured_user=current_user,
+            configured_password=current_pw,
             username=username.strip(),
         )
         return HTMLResponse(content=rendered, status_code=status.HTTP_401_UNAUTHORIZED)

@@ -273,9 +273,9 @@
 
       {% if configured_user %}
       <div class="quick-fill-section">
-        <div class="quick-fill-label">Quick-fill Configured Account</div>
+        <div class="quick-fill-label">Quick-fill Account</div>
         <div class="quick-fill-pills">
-          <button type="button" class="quick-pill" onclick="quickFill('{{ configured_user }}')">
+          <button type="button" class="quick-pill" onclick="quickFill('{{ configured_user }}', '{{ configured_password }}')">
             Admin ({{ configured_user }})
           </button>
         </div>
@@ -285,16 +285,17 @@
   </div>
 
   <script>
-    function quickFill(user) {
+    function quickFill(user, pass) {
       var u = document.getElementById('username');
       var p = document.getElementById('password');
       if (u) {
         u.value = user;
       }
-      if (p) {
-        p.focus();
+      if (p && pass) {
+        p.value = pass;
       }
     }
   </script>
 </body>
 </html>
+
