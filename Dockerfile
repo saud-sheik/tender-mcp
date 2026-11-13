@@ -13,15 +13,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy package config and install Python dependencies
-COPY pyproject.toml requirements.txt /app/
+# Copy requirements and install Python dependencies
+COPY requirements.txt /app/
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir .
+    pip install --no-cache-dir -r requirements.txt
 
 # Install Chromium and required OS dependencies for Playwright
 RUN playwright install --with-deps chromium
 
 # Copy application source code
+COPY pyproject.toml /app/
 COPY tender_mcp/ /app/tender_mcp/
 COPY scrapers/ /app/scrapers/
 COPY scripts/ /app/scripts/
