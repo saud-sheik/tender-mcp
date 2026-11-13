@@ -30,7 +30,7 @@ COPY keywords.json /app/keywords.json
 COPY README.md /app/README.md
 
 # Install package in editable mode
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir --no-deps -e .
 
 EXPOSE 8000
 
