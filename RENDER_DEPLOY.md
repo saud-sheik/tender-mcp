@@ -93,3 +93,4 @@ Once the build finishes and shows **Live**:
    - If you have HMEL client credentials, save them under the HMEL card.
    - Configure or test your **Instant Slack Webhook Alerts**.
    - Confirm the **Auto-Refresh Scheduler** status shows **Active (every 180 minutes)**.
+

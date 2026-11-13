@@ -333,6 +333,10 @@
         CPPP <strong>{{ health.sources.cppp.new }} new</strong> of {{ health.sources.cppp.fetched }} · GeM <strong>{{ health.sources.gem.new }} new</strong> of {{ health.sources.gem.fetched }} · HMEL <strong>{{ health.sources.hmel.new }} new</strong> of {{ health.sources.hmel.fetched }}
       </div>
       <a href="/health" style="font-size: 0.8rem; color: var(--text-dim);" title="JSON Status API">API</a>
+      {% if current_user %}
+        <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">👤 {{ current_user }}</span>
+        <a href="/logout" style="font-size: 0.8rem; color: var(--danger); font-weight: 600; padding: 3px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border);" title="Sign out">Logout</a>
+      {% endif %}
       <button type="button" class="btn-theme" onclick="toggleTheme()" aria-label="Toggle light or dark theme">Theme</button>
     </div>
   </header>

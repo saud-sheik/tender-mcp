@@ -12,7 +12,10 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 import asyncio
+import base64
 import csv
+import hashlib
+import hmac
 import io
 import json
 import logging
@@ -24,7 +27,6 @@ from urllib.parse import urlencode
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from tender_mcp.config import (
@@ -77,7 +79,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Swamina Tender Aggregator Dashboard", lifespan=lifespan)
-security = HTTPBasic()
+
+SESSION_COOKIE = "tender_session"
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 jinja_env = Environment(
@@ -87,8 +90,59 @@ jinja_env = Environment(
 jinja_env.filters["to_ist"] = to_ist_display
 
 
-def verify_auth(credentials: HTTPBasicCredentials = Depends(security)) -> str:
-    """Verify HTTP Basic credentials in constant time."""
+def create_session_token(username: str) -> str:
+    """Create a signed HMAC session token for dashboard login."""
+    _, current_pw = get_dashboard_credentials()
+    secret = (current_pw or "swamina-tender-default-secret").encode("utf-8")
+    ts = str(int(datetime.now(timezone.utc).timestamp()))
+    payload = f"{username}:{ts}"
+    sig = hmac.new(secret, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{payload}:{sig}"
+
+
+def verify_session_token(token: str) -> str | None:
+    """Validate signed HMAC session token and enforce expiration (14 days)."""
+    try:
+        parts = token.split(":")
+        if len(parts) != 3:
+            return None
+        user, ts_str, sig = parts
+        current_user, current_pw = get_dashboard_credentials()
+        secret = (current_pw or "swamina-tender-default-secret").encode("utf-8")
+        payload = f"{user}:{ts_str}"
+        expected_sig = hmac.new(secret, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        if not secrets.compare_digest(sig, expected_sig):
+            return None
+        if not current_user or not secrets.compare_digest(user, current_user):
+            return None
+        ts = int(ts_str)
+        now = int(datetime.now(timezone.utc).timestamp())
+        if (now - ts) > (14 * 86400) or ts > (now + 300):
+            return None
+        return user
+    except Exception:
+        return None
+
+
+class NeedsLoginException(Exception):
+    def __init__(self, next_url: str = "/"):
+        self.next_url = next_url
+
+
+@app.exception_handler(NeedsLoginException)
+async def handle_needs_login(request: Request, exc: NeedsLoginException):
+    """Redirect browser cleanly to the login page without triggering native HTTP Basic modal."""
+    target = exc.next_url or "/"
+    login_url = f"/login?next={urlencode({'next': target})}" if target != "/" else "/login"
+    return RedirectResponse(url=login_url, status_code=status.HTTP_303_SEE_OTHER)
+
+
+def verify_auth(request: Request) -> str:
+    """
+    Authenticate request via session cookie or Authorization header.
+    Redirects unauthenticated browser requests to /login.
+    Does NOT return WWW-Authenticate header to prevent native browser modal.
+    """
     current_user, current_pw = get_dashboard_credentials()
     if not current_user or not current_pw:
         raise HTTPException(
@@ -96,15 +150,41 @@ def verify_auth(credentials: HTTPBasicCredentials = Depends(security)) -> str:
             detail="Dashboard credentials unconfigured.",
         )
 
-    is_user_ok = secrets.compare_digest(credentials.username, current_user)
-    is_pw_ok = secrets.compare_digest(credentials.password, current_pw)
-    if not (is_user_ok and is_pw_ok):
+    # 1. Check session cookie
+    token = request.cookies.get(SESSION_COOKIE)
+    if token:
+        user = verify_session_token(token)
+        if user:
+            return user
+
+    # 2. Check Authorization header (HTTP Basic Auth for API/scripts/tests)
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Basic "):
+        try:
+            encoded = auth_header.split(" ", 1)[1]
+            decoded = base64.b64decode(encoded).decode("utf-8")
+            u, p = decoded.split(":", 1)
+            if secrets.compare_digest(u, current_user) and secrets.compare_digest(p, current_pw):
+                return u
+        except Exception:
+            pass
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
-            headers={"WWW-Authenticate": 'Basic realm="Swamina Tender Aggregator"'},
         )
-    return credentials.username
+
+    # 3. Not authenticated
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept or request.method == "GET":
+        next_url = request.url.path
+        if request.url.query:
+            next_url += f"?{request.url.query}"
+        raise NeedsLoginException(next_url=next_url)
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required",
+    )
 
 
 def get_health_data() -> dict[str, Any]:
@@ -295,6 +375,72 @@ def health_endpoint() -> JSONResponse:
     return JSONResponse(status_code=status_code, content=payload)
 
 
+@app.get("/login", response_class=HTMLResponse)
+def login_page(
+    request: Request,
+    next: str = Query("/"),
+    error: str = Query(""),
+) -> Response:
+    """Render modern login page, or redirect to home if already authenticated."""
+    token = request.cookies.get(SESSION_COOKIE)
+    if token and verify_session_token(token):
+        return RedirectResponse(url=next if (next and next.startswith("/")) else "/", status_code=status.HTTP_303_SEE_OTHER)
+
+    current_user, _ = get_dashboard_credentials()
+    template = jinja_env.get_template("login.html")
+    rendered = template.render(
+        next_url=next or "/",
+        error=error,
+        configured_user=current_user,
+        username=request.query_params.get("username", ""),
+    )
+    return HTMLResponse(rendered)
+
+
+@app.post("/login")
+def login_post(
+    request: Request,
+    username: str = Form(""),
+    password: str = Form(""),
+    next: str = Form("/"),
+) -> Response:
+    """Validate credentials, set secure session cookie, and redirect to destination."""
+    current_user, current_pw = get_dashboard_credentials()
+    is_user_ok = bool(current_user and secrets.compare_digest(username.strip(), current_user))
+    is_pw_ok = bool(current_pw and secrets.compare_digest(password.strip(), current_pw))
+
+    if not (is_user_ok and is_pw_ok):
+        template = jinja_env.get_template("login.html")
+        rendered = template.render(
+            next_url=next or "/",
+            error="Invalid username or password. Please try again.",
+            configured_user=current_user,
+            username=username.strip(),
+        )
+        return HTMLResponse(content=rendered, status_code=status.HTTP_401_UNAUTHORIZED)
+
+    token = create_session_token(current_user)
+    target = next if (next and next.startswith("/")) else "/"
+    response = RedirectResponse(url=target, status_code=status.HTTP_303_SEE_OTHER)
+    response.set_cookie(
+        key=SESSION_COOKIE,
+        value=token,
+        httponly=True,
+        samesite="lax",
+        max_age=14 * 86400,
+        path="/",
+    )
+    return response
+
+
+@app.get("/logout")
+def logout() -> RedirectResponse:
+    """Clear session cookie and redirect to login page."""
+    response = RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    response.delete_cookie(key=SESSION_COOKIE, path="/")
+    return response
+
+
 @app.get("/", response_class=HTMLResponse)
 def list_page(
     request: Request,
@@ -370,6 +516,7 @@ def list_page(
         filters=export_params,
         export_query=export_query,
         status_counts=status_counts,
+        current_user=username,
     )
     return HTMLResponse(rendered)
 
@@ -539,6 +686,7 @@ def detail_page(
         closing_history=closing_history,
         owners=owners,
         health=health,
+        current_user=username,
     )
     return HTMLResponse(rendered)
 
@@ -626,6 +774,7 @@ def settings_page(
         scheduler=scheduler_info,
         message=message,
         msg_type=msg_type or "info",
+        current_user=user_auth,
     )
     return HTMLResponse(rendered)
 

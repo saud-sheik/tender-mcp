@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In · Swamina Tender Portal</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 20% 20%, rgba(219, 234, 254, 0.7) 0%, rgba(248, 250, 252, 0.9) 50%, rgba(224, 231, 255, 0.6) 100%), #f8fafc;
+      color: #0f172a;
+      padding: 24px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .login-container {
+      width: 100%;
+      max-width: 440px;
+    }
+    .login-card {
+      background: #ffffff;
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      border-radius: 20px;
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+      padding: 40px 36px 32px 36px;
+    }
+    .brand-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+    .brand-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.01em;
+    }
+    .welcome-title {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 22px;
+      letter-spacing: -0.02em;
+      text-align: center;
+    }
+    .welcome-subtitle {
+      font-size: 0.875rem;
+      color: #64748b;
+      margin-top: 6px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .error-banner {
+      background: #fee2e2;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+      padding: 11px 14px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      animation: fadeIn 0.2s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .form-group {
+      margin-bottom: 18px;
+    }
+    .form-label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 6px;
+    }
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .input-icon {
+      position: absolute;
+      left: 14px;
+      color: #94a3b8;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .form-input {
+      width: 100%;
+      padding: 12px 14px 12px 42px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 0.92rem;
+      color: #0f172a;
+      background: #ffffff;
+      transition: all 0.15s ease-in-out;
+      font-family: inherit;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+    .form-input::placeholder {
+      color: #94a3b8;
+    }
+    .btn-submit {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      background: #2563eb;
+      color: #ffffff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 24px;
+      transition: background 0.15s ease, transform 0.05s ease;
+      font-family: inherit;
+    }
+    .btn-submit:hover {
+      background: #1d4ed8;
+    }
+    .btn-submit:active {
+      transform: scale(0.99);
+    }
+    .quick-fill-section {
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid #f1f5f9;
+      text-align: center;
+    }
+    .quick-fill-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: #64748b;
+      margin-bottom: 12px;
+    }
+    .quick-fill-pills {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .quick-pill {
+      background: #eff6ff;
+      border: 1px solid #dbeafe;
+      color: #1d4ed8;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    .quick-pill:hover {
+      background: #dbeafe;
+      border-color: #bfdbfe;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-card">
+      <div class="brand-header">
+        <div class="brand-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z"/>
+          </svg>
+        </div>
+        <div class="brand-title">Swamina Tenders</div>
+      </div>
+
+      <h1 class="welcome-title">Welcome back</h1>
+      <p class="welcome-subtitle">Enter your credentials to access your workspace.</p>
+
+      {% if error %}
+      <div class="error-banner">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span>{{ error }}</span>
+      </div>
+      {% endif %}
+
+      <form method="POST" action="/login">
+        <input type="hidden" name="next" value="{{ next_url }}">
+
+        <div class="form-group">
+          <label class="form-label" for="username">Username or Email</label>
+          <div class="input-wrapper">
+            <span class="input-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            </span>
+            <input 
+              type="text" 
+              id="username" 
+              name="username" 
+              class="form-input" 
+              placeholder="Username" 
+              value="{{ username }}" 
+              required 
+              autocomplete="username"
+              autofocus
+            >
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <div class="input-wrapper">
+            <span class="input-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+            </span>
+            <input 
+              type="password" 
+              id="password" 
+              name="password" 
+              class="form-input" 
+              placeholder="••••••••" 
+              required 
+              autocomplete="current-password"
+            >
+          </div>
+        </div>
+
+        <button type="submit" class="btn-submit">
+          <span>Sign In</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+            <polyline points="12 5 19 12 12 19"></polyline>
+          </svg>
+        </button>
+      </form>
+
+      {% if configured_user %}
+      <div class="quick-fill-section">
+        <div class="quick-fill-label">Quick-fill Configured Account</div>
+        <div class="quick-fill-pills">
+          <button type="button" class="quick-pill" onclick="quickFill('{{ configured_user }}')">
+            Admin ({{ configured_user }})
+          </button>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <script>
+    function quickFill(user) {
+      var u = document.getElementById('username');
+      var p = document.getElementById('password');
+      if (u) {
+        u.value = user;
+      }
+      if (p) {
+        p.focus();
+      }
+    }
+  </script>
+</body>
+</html>

@@ -42,22 +42,55 @@ def _get_auth_header(user: str = "testuser", pw: str = "testpass12345678901234")
 
 
 def test_auth_required():
-    """Verify HTTP Basic auth is strictly enforced."""
+    """Verify web login flow and cookie/basic auth enforcement."""
     client = TestClient(app)
 
-    # 1. No auth -> 401
-    r_no_auth = client.get("/")
-    assert r_no_auth.status_code == 401
-    assert "WWW-Authenticate" in r_no_auth.headers
+    # 1. No auth -> redirects to /login (no native browser basic auth modal)
+    r_no_auth = client.get("/", follow_redirects=False)
+    assert r_no_auth.status_code == 303
+    assert r_no_auth.headers["Location"].startswith("/login")
+    assert "WWW-Authenticate" not in r_no_auth.headers
 
-    # 2. Wrong auth -> 401
+    # 2. Login page loads 200
+    r_login_page = client.get("/login")
+    assert r_login_page.status_code == 200
+    assert "Welcome back" in r_login_page.text
+    assert "Sign In" in r_login_page.text
+
+    # 3. Wrong login credentials -> 401 with error message
+    r_bad_login = client.post("/login", data={"username": "testuser", "password": "wrongpassword"})
+    assert r_bad_login.status_code == 401
+    assert "Invalid username or password" in r_bad_login.text
+
+    # 4. Valid login credentials -> 303 redirect with session cookie
+    r_good_login = client.post(
+        "/login",
+        data={"username": "testuser", "password": "testpass12345678901234"},
+        follow_redirects=False,
+    )
+    assert r_good_login.status_code == 303
+    assert "tender_session" in r_good_login.headers.get("Set-Cookie", "")
+
+    # 5. Access protected page with session cookie -> 200
+    client.cookies.set("tender_session", r_good_login.cookies.get("tender_session"))
+    r_dash = client.get("/")
+    assert r_dash.status_code == 200
+    assert "Swamina" in r_dash.text
+    assert "Logout" in r_dash.text
+
+    # 6. Logout clears cookie and redirects to /login
+    r_logout = client.get("/logout", follow_redirects=False)
+    assert r_logout.status_code == 303
+    assert r_logout.headers["Location"] == "/login"
+
+    # 7. Basic auth header also accepted (for CLI / API / test compatibility)
+    client2 = TestClient(app)
     bad_auth = _get_auth_header("testuser", "wrongpassword")
-    r_bad_auth = client.get("/", headers=bad_auth)
+    r_bad_auth = client2.get("/", headers=bad_auth)
     assert r_bad_auth.status_code == 401
 
-    # 3. Valid auth -> 200
     good_auth = _get_auth_header()
-    r_good = client.get("/", headers=good_auth)
+    r_good = client2.get("/", headers=good_auth)
     assert r_good.status_code == 200
 
 
