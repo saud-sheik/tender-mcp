@@ -7,19 +7,42 @@
   /* KPI Stats Row */
   .kpi-row {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
     gap: 12px;
     margin-bottom: 16px;
   }
   @media (max-width: 900px) {
     .kpi-row {
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
     }
   }
   @media (max-width: 500px) {
     .kpi-row {
       grid-template-columns: repeat(2, 1fr);
     }
+  }
+
+  .star-toggle-btn {
+    background: transparent;
+    border: none;
+    font-size: 1.35rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 2px 4px;
+    line-height: 1;
+    border-radius: 4px;
+    transition: color 0.15s ease, transform 0.1s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 4px;
+  }
+  .star-toggle-btn:hover {
+    transform: scale(1.2);
+    color: #eab308;
+  }
+  .star-toggle-btn.is-watched {
+    color: #eab308;
   }
 
   .kpi-card {
@@ -264,6 +287,26 @@
     margin-top: 6px;
     align-items: center;
   }
+  .badge-source {
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-weight: 600;
+    transition: opacity 0.15s ease;
+  }
+  .badge-source:hover {
+    opacity: 0.85;
+    text-decoration: none;
+  }
+  .badge-source-gem { background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
+  .badge-source-cppp { background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; }
+  .badge-source-hmel, .badge-source-hmel_email { background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+
+  [data-theme="dark"] .badge-source-gem { background: #431407; color: #fdba74; border-color: #9a3412; }
+  [data-theme="dark"] .badge-source-cppp { background: #082f49; color: #7dd3fc; border-color: #0369a1; }
+  [data-theme="dark"] .badge-source-hmel, [data-theme="dark"] .badge-source-hmel_email { background: #3b0764; color: #d8b4fe; border-color: #6b21a8; }
+
 
   /* Right Side of Row: Days & EMD */
   .tender-right {
@@ -628,7 +671,10 @@
 
   <a href="/?status=all&{{ base_filter_qs }}" class="kpi-card {% if current_status == 'all' %}active{% endif %}">
     <div class="kpi-num">{{ status_counts.all if status_counts is defined else total_count }}</div>
-    <div class="kpi-label">All tenders</div>
+    <div class="kpi-label">Open tenders</div>
+    {% if status_counts is defined and status_counts.total_stored is defined %}
+      <div style="font-size: 0.72rem; color: var(--text-dim); margin-top: 2px;">{{ status_counts.total_stored }} total stored</div>
+    {% endif %}
   </a>
 
   <a href="/?status=new&{{ base_filter_qs }}" class="kpi-card {% if current_status == 'new' %}active{% endif %}">
@@ -655,6 +701,11 @@
     <div class="kpi-num">{{ status_counts.skipped if status_counts is defined else 0 }}</div>
     <div class="kpi-label">Skipped</div>
   </a>
+
+  <a href="/?status=watched&{{ base_filter_qs }}" class="kpi-card {% if current_status == 'watched' %}active{% endif %}" title="View starred/saved tenders">
+    <div class="kpi-num" style="color: #eab308;">{{ status_counts.watched if status_counts is defined else 0 }}</div>
+    <div class="kpi-label">⭐ Watched</div>
+  </a>
 </div>
 
 <!-- Compact Filter Bar -->
@@ -671,11 +722,12 @@
       <!-- Tier -->
       <div class="filter-item">
         <label for="tier">Tier</label>
-        <select id="tier" name="tier">
+        <select id="tier" name="tier" onchange="this.form.submit()">
           <option value="all" {% if filters.tier == 'all' %}selected{% endif %}>All Tiers</option>
-          <option value="A" {% if filters.tier == 'A' %}selected{% endif %}>Tier A (score 70+)</option>
+          <option value="A" {% if filters.tier == 'A' %}selected{% endif %}>Tier A (relevant, oil/gas buyer)</option>
           <option value="B" {% if filters.tier == 'B' %}selected{% endif %}>Tier B (score 40-69)</option>
           <option value="C" {% if filters.tier == 'C' %}selected{% endif %}>Tier C (score &lt; 40)</option>
+          <option value="buyer_match" {% if filters.tier == 'buyer_match' %}selected{% endif %}>Oil/gas buyer, supply tender (needs review)</option>
         </select>
       </div>
 
@@ -698,7 +750,7 @@
       <!-- Source -->
       <div class="filter-item">
         <label for="source">Source</label>
-        <select id="source" name="source">
+        <select id="source" name="source" onchange="this.form.submit()">
           <option value="all" {% if filters.source == 'all' %}selected{% endif %}>All sources</option>
           <option value="gem" {% if filters.source == 'gem' %}selected{% endif %}>GeM</option>
           <option value="cppp" {% if filters.source == 'cppp' %}selected{% endif %}>CPPP</option>
@@ -709,7 +761,7 @@
       <!-- Closing Window -->
       <div class="filter-item">
         <label for="closing_window">Closing in</label>
-        <select id="closing_window" name="closing_window">
+        <select id="closing_window" name="closing_window" onchange="this.form.submit()">
           <option value="all" {% if filters.closing_window == 'all' %}selected{% endif %}>All windows</option>
           <option value="urgent" {% if filters.closing_window == 'urgent' %}selected{% endif %}>Urgent (≤ 48h)</option>
           <option value="soon" {% if filters.closing_window == 'soon' %}selected{% endif %}>Soon (48h - 7d)</option>
@@ -720,7 +772,7 @@
       <!-- Eligibility -->
       <div class="filter-item">
         <label for="eligibility">Eligibility</label>
-        <select id="eligibility" name="eligibility">
+        <select id="eligibility" name="eligibility" onchange="this.form.submit()">
           <option value="all" {% if filters.eligibility == 'all' %}selected{% endif %}>All eligibilities</option>
           <option value="no_blockers_found" {% if filters.eligibility == 'no_blockers_found' %}selected{% endif %}>No blockers found</option>
           <option value="likely_not_eligible" {% if filters.eligibility == 'likely_not_eligible' %}selected{% endif %}>Likely not eligible</option>
@@ -731,10 +783,11 @@
       <!-- Match Basis -->
       <div class="filter-item">
         <label for="match_basis">Match Basis</label>
-        <select id="match_basis" name="match_basis">
+        <select id="match_basis" name="match_basis" onchange="this.form.submit()">
           <option value="all" {% if filters.match_basis == 'all' %}selected{% endif %}>All</option>
           <option value="item" {% if filters.match_basis == 'item' %}selected{% endif %}>Item match</option>
           <option value="location_only" {% if filters.match_basis == 'location_only' %}selected{% endif %}>Location only</option>
+          <option value="buyer_match" {% if filters.match_basis == 'buyer_match' %}selected{% endif %}>Oil/gas buyer, supply tender (needs review)</option>
         </select>
       </div>
 
@@ -799,15 +852,53 @@
         <!-- Middle Info -->
         <div class="tender-main">
           <a href="/tenders/{{ t.id }}" class="tender-title" onclick="event.stopPropagation()">{{ t.title }}</a>
+          {% if t.is_mr_title %}
+            {% if t.pdf_item_category %}
+              <span class="mr-category-note" style="font-size: 0.8rem; color: var(--primary); font-weight: 600; margin-left: 6px;">
+                [{{ t.pdf_item_category }}]
+              </span>
+            {% else %}
+              <span class="badge" style="background: #fef3c7; color: #92400e; border-color: #fde68a; margin-left: 6px;">Details in buyer documents</span>
+            {% endif %}
+          {% endif %}
           <div class="tender-org">{{ t.organisation }}</div>
 
           <div class="tender-chips">
             <span class="badge badge-tier-{{ t.tier }}">Tier {{ t.tier }}</span>
-            <span class="badge" style="background: var(--border-subtle); color: var(--text-muted);">{{ t.source|upper }}</span>
+            {% set s_lower = (t.source or '')|lower %}
+            {% if s_lower == 'gem' %}
+              {% set s_name = 'GeM' %}
+              {% set s_domain = 'bidplus.gem.gov.in' %}
+            {% elif s_lower == 'cppp' %}
+              {% set s_name = 'CPPP' %}
+              {% set s_domain = 'eprocure.gov.in' %}
+            {% elif 'email' in s_lower %}
+              {% set s_name = 'HMEL (email)' %}
+              {% set s_domain = 'hmeleprocurement.mjunction.in' %}
+            {% elif 'hmel' in s_lower %}
+              {% set s_name = 'HMEL' %}
+              {% set s_domain = 'hmeleprocurement.mjunction.in' %}
+            {% else %}
+              {% set s_name = t.source|upper %}
+              {% set s_domain = '' %}
+            {% endif %}
+            {% if t.link %}
+              <a href="{{ t.link }}" target="_blank" rel="noopener noreferrer" class="badge badge-source badge-source-{{ s_lower }}" onclick="event.stopPropagation()" title="Open on {{ s_domain or s_name }}">
+                {{ s_name }}{% if s_domain %} · {{ s_domain }}{% endif %} <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-left: 2px;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+              </a>
+            {% else %}
+              <span class="badge badge-source badge-source-{{ s_lower }}" title="{{ s_domain or s_name }}">
+                {{ s_name }}{% if s_domain %} · {{ s_domain }}{% endif %} <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-left: 2px;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+              </span>
+            {% endif %}
             {% if t.tender_kind %}
               <span class="badge" style="background: var(--border-subtle); color: var(--text-muted);">{{ t.tender_kind }}</span>
             {% endif %}
             <span class="badge badge-status-{{ t.status }}">{{ t.status }}</span>
+
+            {% if t.is_single_tender or t.single_tender %}
+              <span class="badge" style="background: #fef3c7; color: #92400e; border-color: #fde68a;">Single tender</span>
+            {% endif %}
 
             {% if t.owner %}
               <span class="badge" style="background: var(--card-subtle); color: var(--text-muted); border-color: var(--border);">👤 {{ t.owner }}</span>
@@ -830,7 +921,7 @@
             {% endif %}
 
             {% if t.buyer_overrides_gem_fields %}
-              <span class="badge" style="background: #fee2e2; color: #991b1b; border-color: #fecaca;" title="EMD / turnover set in buyer documents, check them before relying on these numbers">Buyer overrides EMD/Turnover</span>
+              <span class="badge" style="background: #fee2e2; color: #991b1b; border-color: #fecaca;">EMD/turnover in buyer documents</span>
             {% endif %}
 
             {% if not t.estimated_bid_value_inr and (t.floor_price_inr_min or t.floor_price_inr_max) %}
@@ -869,11 +960,11 @@
           <div class="emd-val">
             {% if t.emd_amount_inr %}
               EMD ₹{{ "{:,.0f}".format(t.emd_amount_inr) }}
+            {% elif t.emd_amount_inr_min and t.emd_amount_inr_max and t.emd_amount_inr_min == t.emd_amount_inr_max %}
+              EMD ₹{{ "{:,.0f}".format(t.emd_amount_inr_min) }} per schedule
             {% elif t.emd_amount_inr_min or t.emd_amount_inr_max %}
               EMD ₹{{ "{:,.0f}".format(t.emd_amount_inr_min or 0) }} - ₹{{ "{:,.0f}".format(t.emd_amount_inr_max or 0) }}
-            {% elif t.emd_value %}
-              EMD {{ t.emd_value }}
-            {% elif t.source == 'cppp' %}
+            {% elif t.source == 'cppp' or 'hmel' in (t.source or '')|lower %}
               EMD <span style="color: var(--text-muted);">See portal</span>
             {% elif t.source == 'gem' and (not t.pdf_parse_status or t.pdf_parse_status in ['none', '']) %}
               EMD <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
@@ -883,6 +974,13 @@
               EMD Nil / Exempt
             {% endif %}
           </div>
+
+          <button type="button"
+                  class="star-toggle-btn {% if t.is_watched %}is-watched{% endif %}"
+                  onclick="toggleWatch(event, '{{ t.id }}', this)"
+                  title="{{ 'Remove from Watchlist' if t.is_watched else 'Star / Add to Watchlist' }}">
+            {{ '★' if t.is_watched else '☆' }}
+          </button>
         </div>
       </div>
     {% endfor %}
@@ -1007,6 +1105,60 @@
     var initialMode = (sortSelect && sortSelect.value) ? sortSelect.value : 'score_desc';
     sortTendersList(initialMode);
   });
+
+  window.copyBidNumber = function(text, btn) {
+    if (!text) return;
+    function showCopied() {
+      var orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(function() { btn.textContent = orig; }, 1800);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(showCopied).catch(function() {
+        fallbackCopy(text, btn);
+      });
+    } else {
+      fallbackCopy(text, btn);
+    }
+  };
+  function fallbackCopy(text, btn) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      var orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(function() { btn.textContent = orig; }, 1800);
+    } catch(e) {}
+    document.body.removeChild(ta);
+  }
+
+  window.toggleWatch = async function(evt, tenderId, btn) {
+    if (evt) evt.stopPropagation();
+    try {
+      var res = await fetch('/tenders/' + encodeURIComponent(tenderId) + '/toggle-watch', {
+        method: 'POST'
+      });
+      if (res.ok) {
+        var data = await res.json();
+        if (data.is_watched) {
+          btn.classList.add('is-watched');
+          btn.textContent = '★';
+          btn.title = 'Remove from Watchlist';
+        } else {
+          btn.classList.remove('is-watched');
+          btn.textContent = '☆';
+          btn.title = 'Star / Add to Watchlist';
+        }
+      }
+    } catch(err) {
+      console.error('Failed to toggle watch status:', err);
+    }
+  };
 </script>
 {% endblock %}
 

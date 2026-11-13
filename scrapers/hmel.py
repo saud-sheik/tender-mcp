@@ -87,11 +87,14 @@ async def fetch_tenders() -> list[dict[str, Any]]:
         return []
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=headless)
+        browser = await p.chromium.launch(
+            headless=headless,
+            args=["--disable-blink-features=AutomationControlled"],
+        )
         context_kwargs: dict[str, Any] = {
             "user_agent": (
-                "TenderAggregator/1.0 (Swamina International; "
-                "contact: tender-bot@swamina.example)"
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
             )
         }
 
@@ -159,8 +162,8 @@ async def _navigate_to_tenders(page: Any) -> list[dict[str, Any]] | None:
     await page.goto(TENDERS_URL, wait_until="networkidle", timeout=30000)
     current_url = page.url
 
-    if "login" in current_url.lower():
-        logger.info("hmel: redirected to login (url=%s)", current_url)
+    if "login" in current_url.lower() or "forbidden" in current_url.lower():
+        logger.info("hmel: redirected to login/forbidden (url=%s)", current_url)
         return None
 
     logger.info("hmel: on tenders page (url=%s)", current_url)

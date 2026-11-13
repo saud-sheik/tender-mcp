@@ -172,6 +172,8 @@ async def refresh_all(
         "total_updated": 0,
     }
 
+    new_tier_a_tenders: list[dict[str, Any]] = []
+
     from tender_mcp.matcher import get_min_score
     min_score = get_min_score()
 
@@ -213,6 +215,8 @@ async def refresh_all(
                     _, is_new = upsert_tender(t)
                     if is_new:
                         src_new += 1
+                        if t.get("tier") == "A" or (t.get("relevance_score") or 0) >= 70:
+                            new_tier_a_tenders.append(t)
                     else:
                         src_updated += 1
                     if t.get("relevance_score", 0) >= min_score:
@@ -256,13 +260,127 @@ async def refresh_all(
             summary["total_new"] += src_new
             summary["total_updated"] += src_updated
 
+    # Automatic PDF reading after refresh
+    pdf_stats = auto_enrich_gem_pdfs(delay=2.0)
+    summary["gem_pdf_enrichment"] = pdf_stats
+
+    # Consistency check
+    try:
+        from scripts.check_consistency import check_consistency
+        is_consistent, violations = check_consistency()
+        summary["consistency_check"] = {
+            "passed": is_consistent,
+            "violations": {k: len(v) for k, v in violations.items()},
+        }
+        if not is_consistent:
+            logger.error("refresh: consistency check found violations: %s", summary["consistency_check"]["violations"])
+    except Exception as exc:
+        logger.exception("refresh: consistency check failed: %s", exc)
+        summary["consistency_check"] = {"passed": False, "error": str(exc)}
+
     finished_at = datetime.now(timezone.utc).isoformat()
     summary["finished_at"] = finished_at
+
+    # Instant Slack notification for new Tier A / high-value tenders
+    if new_tier_a_tenders:
+        try:
+            from tender_mcp.notifications import send_tier_a_alert
+            notif_ok = send_tier_a_alert(new_tier_a_tenders)
+            summary["instant_alerts_sent"] = notif_ok
+        except Exception as exc:
+            logger.warning("refresh: notification dispatch error: %s", exc)
 
     # Write health summary to refresh.log
     _write_health_log(summary)
 
     return summary
+
+
+def auto_enrich_gem_pdfs(delay: float = 2.0) -> dict[str, int]:
+    """
+    Download and parse PDF of every open GeM tender in tier A or B
+    that has pdf_parse_status = 'none' (or empty/null).
+    Uses a 2-second delay between downloads, stops at first block/captcha,
+    and rescores via save_gem_pdf_enrichment (including category rules).
+    Reports how many were read, failed and skipped.
+    """
+    from tender_mcp.db import get_conn, save_gem_pdf_enrichment
+    from tender_mcp.gem_pdf import download_gem_pdf, parse_gem_pdf, load_profile, GemBlockedError
+
+    profile = load_profile()
+    stats: dict[str, Any] = {"read": 0, "failed": 0, "skipped": 0, "failures": []}
+
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, link, closing_date, bid_number
+            FROM tenders
+            WHERE source = 'gem'
+              AND tier IN ('A', 'B')
+              AND (pdf_parse_status = 'none' OR pdf_parse_status IS NULL OR pdf_parse_status = '')
+              AND closing_date > strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+            ORDER BY closing_date ASC
+            """
+        ).fetchall()
+
+    logger.info("auto_enrich_gem_pdfs: Found %d open GeM tenders in tier A/B with unparsed PDF", len(rows))
+    if not rows:
+        return stats
+
+    for idx, r in enumerate(rows, 1):
+        tid = r["id"]
+        link = r["link"]
+        close_iso = r["closing_date"]
+        exp_bid_no = r["bid_number"] or tid.replace("gem:", "").replace("_", "/")
+        doc_id = link.rstrip("/").split("/")[-1] if link else ""
+
+        if not doc_id:
+            logger.warning("auto_enrich_gem_pdfs: [%d/%d] Tender %s has no doc_id in link: %s", idx, len(rows), tid, link)
+            stats["skipped"] += 1
+            continue
+
+        try:
+            pdf_path = download_gem_pdf(
+                link=link,
+                bid_doc_id=doc_id,
+                delay=delay,
+                closing_date_iso=close_iso,
+            )
+        except GemBlockedError as e:
+            logger.error("auto_enrich_gem_pdfs: Block/Captcha detected on tender %s: %s. Stopping.", tid, e)
+            stats["skipped"] += (len(rows) - idx + 1)
+            break
+        except Exception as e:
+            logger.error("auto_enrich_gem_pdfs: Error downloading tender %s (%s): %s", tid, doc_id, e)
+            stats["failed"] += 1
+            stats["failures"].append({"id": tid, "doc_id": doc_id, "reason": f"Download exception: {e}"})
+            continue
+
+        if not pdf_path or not pdf_path.exists():
+            logger.warning("auto_enrich_gem_pdfs: PDF not available for tender %s (%s)", tid, doc_id)
+            stats["failed"] += 1
+            stats["failures"].append({"id": tid, "doc_id": doc_id, "reason": "Non-PDF response or download returned None"})
+            continue
+
+        try:
+            parsed = parse_gem_pdf(pdf_path, expected_bid_number=exp_bid_no)
+            save_gem_pdf_enrichment(tid, parsed, profile=profile)
+            parse_st = parsed.get("pdf_parse_status")
+            if parse_st in ("ok", "partial"):
+                stats["read"] += 1
+            else:
+                stats["failed"] += 1
+                stats["failures"].append({"id": tid, "doc_id": doc_id, "reason": f"pdf_parse_status: {parse_st} ({parsed.get('error', '')})"})
+        except Exception as e:
+            logger.error("auto_enrich_gem_pdfs: Error parsing/enriching tender %s: %s", tid, e)
+            stats["failed"] += 1
+            stats["failures"].append({"id": tid, "doc_id": doc_id, "reason": f"Parse exception: {e}"})
+
+    logger.info(
+        "auto_enrich_gem_pdfs: finished. read=%d failed=%d skipped=%d",
+        stats["read"], stats["failed"], stats["skipped"]
+    )
+    return stats
 
 
 def _write_health_log(summary: dict[str, Any]) -> None:
@@ -276,6 +394,9 @@ def _write_health_log(summary: dict[str, Any]) -> None:
             lines.append(
                 f"  [{src.upper()}] fetched={data['fetched']} valid={data.get('valid', data['fetched'])} relevant={data.get('relevant', 0)} new={data['new']} updated={data['updated']}{err_str}"
             )
+        if "gem_pdf_enrichment" in summary:
+            ps = summary["gem_pdf_enrichment"]
+            lines.append(f"  [GEM_PDF] read={ps.get('read', 0)} failed={ps.get('failed', 0)} skipped={ps.get('skipped', 0)}")
         lines.append(
             f"  [TOTAL] fetched={summary['total_fetched']} relevant={summary.get('total_relevant', 0)} new={summary['total_new']} updated={summary['total_updated']}\n"
         )

@@ -70,6 +70,7 @@ tender-mcp/
 | `export_tenders` | Write filtered tenders to CSV in `./exports/`; returns path |
 | `suggest_relevance` | Score a tender against your configured KEYWORDS |
 | `tender_stats` | DB counts and last-refresh statistics |
+| `configure_and_fetch_hmel` | Configure HMEL vendor credentials and pull live tenders |
 
 ## Environment Variables
 
@@ -134,6 +135,14 @@ uvicorn tender_mcp.web.app:app --host 127.0.0.1 --port 8000
 ```
 Visit http://127.0.0.1:8000 in your browser and log in with credentials from `.env` (`DASHBOARD_USER` / `DASHBOARD_PASSWORD`).
 
+## Direct Portal Fetching (Without Browser / Localhost)
+
+To scrape tenders directly from the command line without starting the web dashboard:
+```bash
+python scripts/fetch_portal.py
+```
+This interactively prompts for the portal (HMEL, GeM, or CPPP), securely accepts credentials if required, and pulls live bids directly into `tenders.db`.
+
 ## Running Tests
 
 ```bash
@@ -195,9 +204,19 @@ Credentials and runtime configuration are read exclusively from `.env`:
 - `HEADLESS`: `true` in production to run headless Chromium.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`: SMTP server credentials for alerts.
 - `DIGEST_FROM`, `DIGEST_TO`: Sender and recipient email addresses for daily digest.
-- `SLACK_WEBHOOK_URL`: (Optional) Slack incoming webhook for instant alert notifications.
+- `SLACK_WEBHOOK_URL`: (Optional) Slack incoming webhook for instant alert notifications on newly ingested Tier A tenders.
+- `AUTO_REFRESH_INTERVAL_MINUTES`: (Optional) Background auto-refresh loop interval in minutes (e.g. `180` for 3 hours, default `0` = manual only). Configurable in UI at `/settings`.
 
-### 2. Database Backups
+### 2. Watchlist & Saved Bids
+- Star or unstar high-priority bids directly on list cards or detail pages with 1 click.
+- Filter immediately by clicking the **⭐ Watched** KPI stat card or querying `/?status=watched`.
+- Also supported programmatically via MCP tools `toggle_watchlist(tender_id)` and `get_watchlist()`.
+
+### 3. Instant Alerts & Background Scheduler
+- **Instant Slack Alerts**: Automatically sends formatted notifications when new Tier A / high-relevance bids are scraped. Configured and testable at `/settings`.
+- **Built-in Auto-Refresh**: No cron required. Set `AUTO_REFRESH_INTERVAL_MINUTES=180` (or configure on `/settings`) to automatically cycle GeM, CPPP, and HMEL in the background.
+
+### 4. Database Backups
 Nightly backups are automated via `scripts/backup_db.py`:
 ```bash
 python3 scripts/backup_db.py --keep 14

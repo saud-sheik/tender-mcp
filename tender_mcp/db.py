@@ -67,7 +67,8 @@ CREATE TABLE IF NOT EXISTS tenders (
     date_check        TEXT DEFAULT 'not_checked',
     similar_category  TEXT,
     category_noise_reason TEXT,
-    buyer_match       INTEGER DEFAULT 0
+    buyer_match       INTEGER DEFAULT 0,
+    is_watched        INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS refresh_log (
@@ -209,6 +210,7 @@ def init_db() -> None:
             ("similar_category", "TEXT"),
             ("category_noise_reason", "TEXT"),
             ("buyer_match", "INTEGER DEFAULT 0"),
+            ("is_watched", "INTEGER DEFAULT 0"),
         ]:
             if col_name not in columns:
                 try:
@@ -220,8 +222,12 @@ def init_db() -> None:
         conn.execute("UPDATE tenders SET date_check = 'extended_auto' WHERE date_check = 'extended'")
         # Migrate location_only tenders out of Tier A to Tier B
         conn.execute("UPDATE tenders SET tier = 'B' WHERE match_basis = 'location_only' AND tier = 'A'")
-        # Migrate tenders with no PDF data (pdf_parse_status = 'none') and CPPP rows to 'not_checked'
-        conn.execute("UPDATE tenders SET date_check = 'not_checked' WHERE pdf_parse_status = 'none' OR source = 'cppp'")
+        # Migrate buyer_match tenders to Tier B
+        conn.execute("UPDATE tenders SET tier = 'B' WHERE buyer_match = 1 AND tier != 'B'")
+        # Migrate category_noise_reason tenders out of Tier A to Tier B
+        conn.execute("UPDATE tenders SET tier = 'B' WHERE category_noise_reason IS NOT NULL AND category_noise_reason != '' AND tier = 'A'")
+        # Migrate tenders with no PDF data (pdf_parse_status = 'none'), CPPP, and HMEL rows to 'not_checked'
+        conn.execute("UPDATE tenders SET date_check = 'not_checked' WHERE pdf_parse_status = 'none' OR source IN ('cppp', 'hmel')")
         # Migrate was_extended for existing tenders with extensions recorded
         conn.execute("""
             UPDATE tenders SET was_extended = 1
@@ -375,11 +381,12 @@ def init_db() -> None:
                 org = r_dict.get("organisation") or ""
                 buyer_flag = 1 if is_oil_gas_buyer(org) else 0
                 match_basis = res.get("match_basis") or "item"
-                tier = compute_tier(score, org, match_basis=match_basis)
+                buyer_match = res.get("buyer_match", 0)
+                tier = compute_tier(score, org, match_basis=match_basis, buyer_match=bool(buyer_match))
                 kind = res.get("tender_kind") or classify_tender_kind(r_dict.get("title") or "")
                 conn.execute(
-                    "UPDATE tenders SET relevance_score = ?, matched_terms = ?, status = ?, buyer_is_oil_gas = ?, tier = ?, tender_kind = ?, is_consumable = ?, match_basis = ? WHERE id = ?",
-                    (score, m_terms, st, buyer_flag, tier, kind, 1 if res.get("is_consumable") else 0, match_basis, r_dict["id"]),
+                    "UPDATE tenders SET relevance_score = ?, matched_terms = ?, status = ?, buyer_is_oil_gas = ?, tier = ?, tender_kind = ?, is_consumable = ?, match_basis = ?, buyer_match = ? WHERE id = ?",
+                    (score, m_terms, st, buyer_flag, tier, kind, 1 if res.get("is_consumable") else 0, match_basis, buyer_match, r_dict["id"]),
                 )
 
         # Migration 8: fix cppp:1 if present
@@ -394,6 +401,7 @@ def init_db() -> None:
 
         # Migration: Ensure location_only tenders are never Tier A
         conn.execute("UPDATE tenders SET tier = 'B' WHERE match_basis = 'location_only' AND tier = 'A'")
+        conn.execute("UPDATE tenders SET tier = 'B' WHERE category_noise_reason IS NOT NULL AND category_noise_reason != '' AND tier = 'A'")
         conn.commit()
 
 
@@ -463,9 +471,26 @@ def upsert_tender(tender: dict[str, Any]) -> tuple[str, bool]:
     from tender_mcp.matcher import score_tender, is_oil_gas_buyer, compute_tier
     from tender_mcp.dates import to_iso8601
 
-    scoring = score_tender(tender)
+    with get_conn() as conn:
+        existing = conn.execute(
+            """SELECT id, closing_date, extensions_seen, was_extended,
+                      original_end_utc, auto_extend_days, auto_extend_max_count,
+                      auto_extension_limit_utc, corrigendum_date, date_check,
+                      is_extended, extension_days_observed, status, owner, notes,
+                      similar_category, category_noise_reason, item_category, relevance_score, tier, buyer_match
+               FROM tenders WHERE id = ?""", (tid,)
+        ).fetchone()
 
-    # Ensure relevance score is calculated
+    # Merge existing extracted fields if present so category noise & scoring have full context
+    tender_to_score = dict(tender)
+    if existing:
+        if not tender_to_score.get("item_category") and existing["item_category"]:
+            tender_to_score["item_category"] = existing["item_category"]
+        if not tender_to_score.get("similar_category") and existing["similar_category"]:
+            tender_to_score["similar_category"] = existing["similar_category"]
+
+    scoring = score_tender(tender_to_score)
+
     relevance_score = tender.get("relevance_score")
     if relevance_score is None:
         relevance_score = scoring["score"]
@@ -487,11 +512,21 @@ def upsert_tender(tender: dict[str, Any]) -> tuple[str, bool]:
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     org = str(tender.get("organisation") or "")
-    buyer_flag = 1 if is_oil_gas_buyer(org) else 0
+    buyer_flag = 1 if is_oil_gas_buyer(org) else scoring.get("buyer_is_oil_gas", 0)
     consumable_flag = 1 if scoring.get("is_consumable") else 0
-    match_basis = scoring.get("match_basis") or "item"
-    buyer_match_flag = scoring.get("buyer_match", 0) if int(relevance_score) < 30 else 0
-    tier = compute_tier(int(relevance_score), org, match_basis=match_basis, buyer_match=bool(buyer_match_flag))
+    match_basis = tender.get("match_basis") or scoring.get("match_basis") or "item"
+    buyer_match_flag = tender.get("buyer_match")
+    if buyer_match_flag is None:
+        buyer_match_flag = scoring.get("buyer_match", 0) if int(relevance_score) < 30 else 0
+    else:
+        buyer_match_flag = 1 if (int(buyer_match_flag) and int(relevance_score) < 30) else 0
+
+    cat_noise_reason = tender.get("category_noise_reason") or scoring.get("category_noise_reason")
+    tier = tender.get("tier")
+    if tier is None:
+        tier = compute_tier(int(relevance_score), org, match_basis=match_basis, category_noise_reason=cat_noise_reason, buyer_match=bool(buyer_match_flag))
+    elif buyer_match_flag and not cat_noise_reason and tier == "C":
+        tier = "B"
     tender_kind = scoring.get("tender_kind") or ""
     if not tender_kind:
         from tender_mcp.matcher import classify_tender_kind
@@ -503,15 +538,6 @@ def upsert_tender(tender: dict[str, Any]) -> tuple[str, bool]:
     open_date = to_iso8601(tender.get("opening_date", ""))
 
     with get_conn() as conn:
-        existing = conn.execute(
-            """SELECT id, closing_date, extensions_seen, was_extended,
-                      original_end_utc, auto_extend_days, auto_extend_max_count,
-                      auto_extension_limit_utc, corrigendum_date, date_check,
-                      is_extended, extension_days_observed, status, owner, notes,
-                      similar_category, category_noise_reason, item_category, relevance_score, tier, buyer_match
-               FROM tenders WHERE id = ?""", (tid,)
-        ).fetchone()
-
         import json
         raw_json = json.dumps(tender.get("raw", {}), ensure_ascii=False)
 
@@ -556,8 +582,8 @@ def upsert_tender(tender: dict[str, Any]) -> tuple[str, bool]:
                     "match_basis": match_basis,
                     "raw_json": raw_json,
                     "date_check": tender.get("date_check") or "not_checked",
-                    "similar_category": tender.get("similar_category"),
-                    "category_noise_reason": scoring.get("category_noise_reason"),
+                    "similar_category": tender_to_score.get("similar_category"),
+                    "category_noise_reason": cat_noise_reason,
                     "buyer_match": buyer_match_flag,
                 },
             )
@@ -570,25 +596,6 @@ def upsert_tender(tender: dict[str, Any]) -> tuple[str, bool]:
             is_ext = existing["is_extended"] if ("is_extended" in existing.keys() and existing["is_extended"] is not None) else 0
             date_chk = existing["date_check"] if ("date_check" in existing.keys() and existing["date_check"]) else "not_checked"
             ext_days_obs = existing["extension_days_observed"] if ("extension_days_observed" in existing.keys()) else None
-
-            # Check if tender already has similar_category or category_noise_reason
-            existing_sim_cat = existing["similar_category"] if "similar_category" in existing.keys() else None
-            existing_noise = existing["category_noise_reason"] if "category_noise_reason" in existing.keys() else None
-            existing_item_cat = existing["item_category"] if "item_category" in existing.keys() else None
-            from tender_mcp.matcher import check_pdf_category_noise, is_product_supply_title, compute_tier
-            sim_to_check = tender.get("similar_category") or existing_sim_cat
-            item_to_check = tender.get("item_category") or existing_item_cat
-            title_to_check = tender.get("title") or existing.get("title") or ""
-            if is_product_supply_title(title_to_check):
-                is_noise, noise_reason = False, None
-            else:
-                is_noise, noise_reason = check_pdf_category_noise(item_to_check, sim_to_check, title_to_check)
-            if is_noise:
-                relevance_score = min(int(relevance_score), 30)
-                tier = compute_tier(int(relevance_score), org, match_basis=match_basis, category_noise_reason=noise_reason, buyer_match=bool(buyer_match_flag))
-                cat_noise_reason = noise_reason
-            else:
-                cat_noise_reason = None if is_product_supply_title(title_to_check) else existing_noise
 
             if old_close and close_date and old_close != close_date:
                 conn.execute(
@@ -1131,4 +1138,44 @@ def get_closing_date_history(tender_id: str) -> list[dict[str, Any]]:
             (tender_id,),
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def toggle_tender_watched(tender_id: str) -> bool:
+    """Toggle is_watched boolean between 0 and 1. Returns the new watched state."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT is_watched FROM tenders WHERE id = ?", (tender_id,)).fetchone()
+        if not row:
+            raise KeyError(f"Tender {tender_id} not found")
+        current = bool(row["is_watched"]) if "is_watched" in row.keys() and row["is_watched"] else False
+        new_state = 0 if current else 1
+        conn.execute("UPDATE tenders SET is_watched = ? WHERE id = ?", (new_state, tender_id))
+        conn.commit()
+        return bool(new_state)
+
+
+def set_tender_watched(tender_id: str, watched: bool) -> bool:
+    """Set is_watched for a tender."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT id FROM tenders WHERE id = ?", (tender_id,)).fetchone()
+        if not row:
+            return False
+        conn.execute("UPDATE tenders SET is_watched = ? WHERE id = ?", (1 if watched else 0, tender_id))
+        conn.commit()
+        return True
+
+
+def get_watched_tenders(limit: int = 100) -> list[dict[str, Any]]:
+    """Return tenders starred/saved to watchlist, sorted by closing date."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM tenders
+            WHERE is_watched = 1
+            ORDER BY closing_date ASC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
 

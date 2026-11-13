@@ -211,27 +211,35 @@ def compute_tier(
     category_noise_reason: str | None = None,
     has_noise: bool = False,
     buyer_match: bool = False,
+    has_cap: bool = False,
 ) -> str:
     """
     Return tier string:
       A = score >= 30 AND organisation matches oil_gas_buyers AND match_basis != 'location_only' AND not category_noise
       B = (score >= 30 AND (organisation does NOT match oil_gas_buyers OR match_basis == 'location_only' OR category_noise))
-          OR buyer_match
-      C = score < 30 AND NOT buyer_match
+          OR buyer_match (if not noise capped)
+      C = score < 30 AND NOT buyer_match (or noise capped)
     """
-    if buyer_match:
-        return "B"
     cfg = config or _CACHED_CONFIG or load_keywords()
     min_score = int(cfg.get("min_score", 30))
-    if score < min_score:
+
+    if category_noise_reason or has_noise or has_cap:
+        if buyer_match:
+            return "C"
+        if score >= min_score:
+            return "B"
         return "C"
-    if category_noise_reason or has_noise:
-        return "B"
+
     if match_basis == "location_only":
         return "B"
-    if is_oil_gas_buyer(organisation, cfg):
+
+    if is_oil_gas_buyer(organisation, cfg) and score >= min_score:
         return "A"
-    return "B"
+
+    if buyer_match or score >= min_score:
+        return "B"
+
+    return "C"
 
 
 def _starts_with_any(title: str, prefixes: list[str]) -> bool:
@@ -440,6 +448,92 @@ def score_text(haystack: str, config: dict[str, Any] | None = None) -> dict[str,
     }
 
 
+def is_single_tender(tender: dict[str, Any]) -> bool:
+    """Check if tender is a single-tender/single-bid procurement from title or PDF fields."""
+    title = str(tender.get("title") or "")
+    if re.search(r"\b(single\s+tender|single\s+bid)\b", title, re.IGNORECASE):
+        return True
+    bid_type = str(tender.get("bid_type") or "")
+    if re.search(r"\b(single\s+tender|single\s+bid|single\s+packet)\b", bid_type, re.IGNORECASE):
+        return True
+    raw = tender.get("raw")
+    if isinstance(raw, dict):
+        raw_bt = str(raw.get("bid_type") or raw.get("type_of_bid") or "")
+        if re.search(r"\b(single\s+tender|single\s+bid|single\s+packet)\b", raw_bt, re.IGNORECASE):
+            return True
+    raw_json_str = tender.get("raw_json")
+    if raw_json_str and isinstance(raw_json_str, str):
+        try:
+            raw_obj = json.loads(raw_json_str)
+            if isinstance(raw_obj, dict):
+                raw_bt = str(raw_obj.get("bid_type") or raw_obj.get("type_of_bid") or "")
+                if re.search(r"\b(single\s+tender|single\s+bid|single\s+packet)\b", raw_bt, re.IGNORECASE):
+                    return True
+        except Exception:
+            pass
+    if tender.get("single_tender"):
+        return True
+    flags = tender.get("flags")
+    if flags:
+        flags_str = json.dumps(flags) if isinstance(flags, (list, dict)) else str(flags)
+        if re.search(r"\b(single\s+tender|single\s+bid)\b", flags_str, re.IGNORECASE):
+            return True
+    return False
+
+
+def check_mr_title_and_category(
+    title: str | None,
+    item_category: str | None,
+    pdf_parse_status: str | None,
+) -> dict[str, Any]:
+    """
+    Check if title is only material-requisition lines.
+    If so:
+      - is_mr_title: True
+      - pdf_read: True when PDF parse status is 'ok' or 'partial' and item_category is present
+      - pdf_item_category: formatted PDF Item Category (when read)
+      - is_generic_category: True when item_category is also generic (does not name a specific product)
+    """
+    t = (title or "").strip()
+    is_mr = bool(re.search(
+        r"^(Custom\s+Bid\s+for\s+Services\s*-\s*)?(Supply\s+(of|Price\s+for|including\s+Freight\s+and\s+GST\s+of)\s+)?(Group[- ]?[A-Z0-9]+[,\s]+)?MR\s+(Item|Sl\.?\s*No|item)",
+        t,
+        re.IGNORECASE,
+    ))
+    pdf_read = pdf_parse_status in ("ok", "partial") and bool(item_category and item_category.strip())
+    pdf_cat = ""
+    is_generic = False
+
+    if is_mr and pdf_read:
+        cat_clean = re.sub(
+            r"\b(Supply\s+of\s+MR\s+Item\s+no\.?|Supply\s+Price\s+for\s+MR\s+item\s+No-?|Supply\s+including\s+Freight\s+and\s+GST\s+of\s+MR\s+Sl\.?\s*No\.?|SITE\s+WORK\s+CHARGES|TRANSPORTATION\s+CHARGES|SUPERVISION\s+CHARGES|MANDATORY\s+SPARES\s+PRICE|TRAINING\s+CHARGES|PWCAMC\s+CHARGES|CPWAMC\s+CHARGES|Per\s+Diem|Freight\s+and\s+GST|MR\s+Item\s+no\.?|MR\s+Sl\.?\s*No\.?|MR\s+item|Group[- ]?[A-Z0-9]+|as\s+per\s+MR(\s+item\s+No\.?[-0-9.]*)?|at\s+Vendor\s+works?|at\s+site|\d+\s+years|for\s+\d+\s+years|complete\s+MR|Tag:\s*[\w/-]+|\d+|[\s,.;:/\(\)\[\]-])+",
+            " ",
+            item_category or "",
+            flags=re.IGNORECASE,
+        ).strip()
+        substantive = [
+            w for w in cat_clean.split()
+            if len(w) >= 3 and w.lower() not in (
+                "per", "for", "and", "the", "charges", "price", "item", "items",
+                "with", "from", "diem", "supervision", "training", "spares", "work", "works",
+                "site", "complete", "supply", "group", "tag", "years", "cpwamc", "pwcamc", "amc", "camc"
+            )
+        ]
+        is_generic = (len(substantive) == 0)
+        parts = [p.strip() for p in (item_category or "").split(",") if p.strip()]
+        first_part = parts[0] if parts else (item_category or "")
+        pdf_cat = first_part[:120] + ("..." if len(first_part) > 120 else "")
+
+    return {
+        "is_mr_title": is_mr,
+        "pdf_read": pdf_read,
+        "pdf_item_category": pdf_cat,
+        "is_generic_category": is_generic,
+    }
+
+
+
+
 def score_tender(
     tender: dict[str, Any],
     config: dict[str, Any] | None = None,
@@ -494,6 +588,8 @@ def score_tender(
     masked_haystack = _mask_negative_phrases(content_haystack, negative_phrases)
 
     matched_exclude = [t for t in exclude_terms if _match_term(t, content_haystack)]
+    lane_exclude_terms: list[str] = cfg.get("lane_exclude", [])
+    matched_lane_exclude = [t for t in lane_exclude_terms if _match_term(t, content_haystack)]
     matched_staffing = [t for t in cfg.get("staffing_noise", []) if _match_term(t, content_haystack)]
     matched_logistics = [t for t in cfg.get("logistics_noise", []) if _match_term(t, content_haystack)]
     matched_service_noise = matched_staffing + matched_logistics
@@ -547,11 +643,7 @@ def score_tender(
             matched_terms_detailed.append(f"{t} (+5)")
         all_matched = matched_strong + matched_weak
 
-        if _strong_only_in_location(masked_haystack, matched_strong) and not matched_items:
-            score = min(score, 40)
-            match_basis = "location_only"
-            assessment = f"LOCATION_ONLY – strong keyword only in plant/location name, capped at 40: {', '.join(matched_strong)}"
-            matched_terms_detailed.append("[location mention without target item, capped at 40]")
+        all_matched = matched_strong + matched_weak
     elif matched_weak:
         base = 20 + (len(matched_weak) - 1) * 5
         score = min(30, base)
@@ -565,32 +657,52 @@ def score_tender(
         assessment = "NONE – no configured keywords matched"
         all_matched = []
 
-    is_prod_supply = is_product_supply_title(title, cfg)
+    # -----------------------------------------------------------------------
+    # (a) Exclude / noise caps using whole-word matching
+    # Never applied when title starts with Supply of / Supply & / Procurement of /
+    # Purchase of (after stripping 'Custom Bid for Services -') unless the noise term
+    # is in the title.
+    # -----------------------------------------------------------------------
+    clean_title = re.sub(r"^Custom\s+Bid\s+for\s+Services\s*-\s*", "", title, flags=re.IGNORECASE).strip()
+    is_prod_supply = is_product_supply_title(clean_title, cfg)
 
-    # staffing_noise / logistics_noise caps (only when context_exclude and exclude did not already apply)
-    # product-supply titles are protected from noise caps
-    if not is_prod_supply and not is_itemless and not matched_context_exclude and not matched_exclude:
-        staffing_with_fields = []
-        for term in matched_staffing:
-            field = "title" if _match_term(term, title) else ("item_category" if _match_term(term, category) else "description")
-            staffing_with_fields.append(f"{term} in {field}")
-        logistics_with_fields = []
-        for term in matched_logistics:
-            field = "title" if _match_term(term, title) else ("item_category" if _match_term(term, category) else "description")
-            logistics_with_fields.append(f"{term} in {field}")
+    # Context exclude & exclude terms (always active if matched)
+    if matched_context_exclude:
+        score = min(score, 20)
+    if matched_exclude:
+        score = min(score, 15)
 
-        score, notes = _apply_noise_caps(score, staffing_with_fields, logistics_with_fields, cfg)
+    # Active staffing and logistics noise:
+    # If is_prod_supply, noise terms in description/category are ignored unless present in clean_title
+    active_staffing: list[str] = []
+    for term in matched_staffing:
+        term_in_title = _match_term(term, clean_title)
+        if not is_prod_supply or term_in_title:
+            field = "title" if term_in_title else ("item_category" if _match_term(term, category) else "description")
+            active_staffing.append(f"{term} in {field}")
+
+    active_logistics: list[str] = []
+    for term in matched_logistics:
+        term_in_title = _match_term(term, clean_title)
+        if not is_prod_supply or term_in_title:
+            field = "title" if term_in_title else ("item_category" if _match_term(term, category) else "description")
+            active_logistics.append(f"{term} in {field}")
+
+    if (active_staffing or active_logistics) and not is_itemless and not matched_context_exclude and not matched_exclude:
+        score, notes = _apply_noise_caps(score, active_staffing, active_logistics, cfg)
         if notes:
             assessment = "SERVICE_NOISE – " + "; ".join(notes)
             matched_terms_detailed.extend(f"[{n}]" for n in notes)
 
-    # pdf_category_noise check (similar_category, item_category, or title)
+    # PDF category noise check:
     item_cat = tender.get("item_category") or category
     sim_cat = tender.get("similar_category")
-    if not is_prod_supply:
-        is_cat_noise, cat_noise_reason = check_pdf_category_noise(item_cat, sim_cat, title, cfg)
-    else:
-        is_cat_noise, cat_noise_reason = False, None
+    is_cat_noise, cat_noise_reason = check_pdf_category_noise(item_cat, sim_cat, title, cfg)
+    if is_cat_noise and is_prod_supply:
+        # If is_prod_supply, category noise only applies if the noise term is in clean_title
+        term_in_title = any(_match_term(t, clean_title) for t in cfg.get("pdf_category_noise", []))
+        if not term_in_title:
+            is_cat_noise, cat_noise_reason = False, None
 
     if is_cat_noise:
         if score > 30:
@@ -598,25 +710,48 @@ def score_tender(
         matched_terms_detailed.append(f"[{cat_noise_reason}, capped at 30]")
         assessment = f"CATEGORY_NOISE – {cat_noise_reason}, capped at 30"
 
-    matched_terms_str = ", ".join(matched_terms_detailed)
-
-    tender_kind = classify_tender_kind(title, cfg)
-    consumable = is_consumable(content_haystack, cfg)
+    # -----------------------------------------------------------------------
+    # (b) buyer_match
+    # -----------------------------------------------------------------------
     org = str(tender.get("organisation") or "")
-
-    # Buyer-match lane check:
-    # 1. buyer_is_oil_gas = 1
-    # 2. title starts with Supply, Procurement, Purchase (after stripping optional Custom Bid for Services -)
-    # 3. no noise phrase (staffing, logistics, category) matched
-    # 4. relevance_score below 30
     buyer_is_og = 1 if is_oil_gas_buyer(org, cfg) else 0
-    clean_title = re.sub(r"^Custom\s+Bid\s+for\s+Services\s*-\s*", "", title, flags=re.IGNORECASE).strip()
-    is_supply_tender = clean_title.lower().startswith(("supply", "procurement", "purchase"))
-    has_noise = bool(matched_staffing or matched_logistics or is_cat_noise or cat_noise_reason)
+    is_supply_tender = is_prod_supply or clean_title.lower().startswith(("supply", "procurement", "purchase"))
+    has_noise = bool(active_staffing or active_logistics or is_cat_noise or cat_noise_reason)
 
-    buyer_match = 1 if (buyer_is_og and is_supply_tender and not has_noise and score < 30) else 0
+    input_matched_terms = tender.get("matched_terms")
+    if isinstance(input_matched_terms, list):
+        input_has_exclude = any("EXCLUDE" in str(term) for term in input_matched_terms)
+    elif isinstance(input_matched_terms, str):
+        input_has_exclude = "EXCLUDE" in input_matched_terms
+    else:
+        input_has_exclude = False
+
+    has_exclude = bool(
+        matched_exclude
+        or matched_lane_exclude
+        or any("EXCLUDE" in str(term) for term in matched_terms_detailed)
+        or input_has_exclude
+    )
+
+    buyer_match = 1 if (buyer_is_og and is_supply_tender and not has_noise and not has_exclude and score < 30) else 0
     buyer_match_label = "Oil/gas buyer, supply tender" if buyer_match else None
 
+    # -----------------------------------------------------------------------
+    # (c) location_only
+    # -----------------------------------------------------------------------
+    if matched_strong and _strong_only_in_location(masked_haystack, matched_strong) and not matched_items:
+        score = min(score, 40)
+        match_basis = "location_only"
+        assessment = f"LOCATION_ONLY – strong keyword only in plant/location name, capped at 40: {', '.join(matched_strong)}"
+        matched_terms_detailed.append("[location mention without target item, capped at 40]")
+    else:
+        match_basis = "item"
+
+    # -----------------------------------------------------------------------
+    # (d) tier
+    # Rules: a noise or category cap removes tier A; location_only is never tier A;
+    # buyer_match is at least B unless a cap applies.
+    # -----------------------------------------------------------------------
     tier = compute_tier(
         score,
         org,
@@ -625,7 +760,12 @@ def score_tender(
         category_noise_reason=cat_noise_reason,
         has_noise=has_noise,
         buyer_match=bool(buyer_match),
+        has_cap=bool(matched_exclude or matched_context_exclude),
     )
+
+    matched_terms_str = ", ".join(matched_terms_detailed)
+    tender_kind = classify_tender_kind(title, cfg)
+    consumable = is_consumable(content_haystack, cfg)
 
     return {
         "score": score,
@@ -645,6 +785,8 @@ def score_tender(
         "matched_terms_str": matched_terms_str,
         "matched_strong": matched_strong,
         "matched_weak": matched_weak,
+        "is_single_tender": is_single_tender(tender),
+        "matched_lane_exclude": matched_lane_exclude,
         "matched_exclude": matched_exclude,
         "matched_service_noise": matched_service_noise,
         "matched_context_exclude": matched_context_exclude,

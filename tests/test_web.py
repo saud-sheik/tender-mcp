@@ -388,7 +388,7 @@ def test_dashboard_redesign_kpis_and_form():
     assert r_list.status_code == 200
 
     # KPI labels
-    assert "All tenders" in r_list.text
+    assert "Open tenders" in r_list.text
     assert "New" in r_list.text
     assert "Interested" in r_list.text
     assert "Bidding" in r_list.text
@@ -397,7 +397,7 @@ def test_dashboard_redesign_kpis_and_form():
 
     # Seeded status counts: total 6, new 2, interested 1, bidding 1, submitted 1, skipped 1
     # Check that KPI numbers appear within their respective card elements
-    assert '<div class="kpi-num">6</div>\n    <div class="kpi-label">All tenders</div>' in r_list.text
+    assert '<div class="kpi-num">6</div>\n    <div class="kpi-label">Open tenders</div>' in r_list.text
     assert '<div class="kpi-num">2</div>\n    <div class="kpi-label">New</div>' in r_list.text
     assert '<div class="kpi-num">1</div>\n    <div class="kpi-label">Interested</div>' in r_list.text
     assert '<div class="kpi-num">1</div>\n    <div class="kpi-label">Bidding</div>' in r_list.text
@@ -484,6 +484,21 @@ def test_pdf_parse_status_and_cppp_labels():
         conn.execute("UPDATE tenders SET pdf_parse_status = 'partial' WHERE id = ?", (t_partial["id"],))
         conn.commit()
 
+    # 5. HMEL tender
+    t_hmel_test = {
+        "id": "hmel:HMEL_TEST_999",
+        "source": "hmel",
+        "title": "HMEL Pipeline Spares",
+        "organisation": "HMEL",
+        "category": "Goods",
+        "published_date": "2026-10-01T00:00:00Z",
+        "closing_date": "2026-11-20T10:00:00Z",
+        "relevance_score": 75,
+        "status": "new",
+        "raw": {},
+    }
+    db_module.upsert_tender(t_hmel_test)
+
     # --- LIST VIEW CHECKS ---
     r_list = client.get("/", headers=auth)
     assert r_list.status_code == 200
@@ -501,6 +516,11 @@ def test_pdf_parse_status_and_cppp_labels():
     cppp_chunk = r_list.text.split(f'data-id="{t_cppp["id"]}"')[1].split('</div>\n      </div>')[0]
     assert "See portal" in cppp_chunk
     assert "Nil / Exempt" not in cppp_chunk
+
+    # (d) HMEL tender shows "See portal" and NOT "Nil / Exempt" in list
+    hmel_chunk = r_list.text.split(f'data-id="{t_hmel_test["id"]}"')[1].split('</div>\n      </div>')[0]
+    assert "See portal" in hmel_chunk
+    assert "Nil / Exempt" not in hmel_chunk
 
     # --- DETAIL VIEW CHECKS ---
     # (a) unparsed GeM tender detail page shows new label and NOT "Nil / Exempt"
@@ -520,11 +540,362 @@ def test_pdf_parse_status_and_cppp_labels():
     assert "See portal" in r_detail_cppp.text
     assert "Nil / Exempt" not in r_detail_cppp.text
 
+    # (d) HMEL tender shows "See portal" and NOT "Nil / Exempt" on detail page
+    r_detail_hmel = client.get(f"/tenders/{t_hmel_test['id']}", headers=auth)
+    assert r_detail_hmel.status_code == 200
+    assert "See portal" in r_detail_hmel.text
+    assert "Nil / Exempt" not in r_detail_hmel.text
+
     # Partial tender detail page shows "Not found in PDF"
     r_detail_partial = client.get(f"/tenders/{t_partial['id']}", headers=auth)
     assert r_detail_partial.status_code == 200
     assert "Not found in PDF" in r_detail_partial.text
     assert "Nil / Exempt" not in r_detail_partial.text
+
+
+def test_source_visibility_and_portal_links():
+    """Verify source labels in list, source card in detail panel, no-link fallback, and safe links."""
+    client = TestClient(app)
+    auth = _get_auth_header()
+
+    # 1. GeM tender with link and bid_no in raw
+    t_gem = {
+        "id": "gem:GEM_2026_B_99999",
+        "source": "gem",
+        "title": "Supply of Gas Monitoring System",
+        "organisation": "ONGC",
+        "category": "Goods",
+        "published_date": "2026-10-01T00:00:00Z",
+        "closing_date": "2026-11-20T10:00:00Z",
+        "relevance_score": 85,
+        "link": "https://bidplus.gem.gov.in/showbidDocument/99999",
+        "status": "new",
+        "raw": {"bid_no": "GEM/2026/B/99999"},
+    }
+    db_module.upsert_tender(t_gem)
+
+    # 2. CPPP tender with link
+    t_cppp = {
+        "id": "cppp:CPPP_2026_88888",
+        "source": "cppp",
+        "title": "Operation of Fire Alarm Network",
+        "organisation": "IOCL",
+        "category": "Services",
+        "published_date": "2026-10-01T00:00:00Z",
+        "closing_date": "2026-11-20T10:00:00Z",
+        "relevance_score": 80,
+        "link": "https://eprocure.gov.in/cppp/tendersfullview/88888",
+        "status": "new",
+        "raw": {},
+    }
+    db_module.upsert_tender(t_cppp)
+
+    # 3. HMEL tender with empty link
+    t_hmel = {
+        "id": "hmel:HMEL_77777",
+        "source": "hmel",
+        "title": "HMEL Refractory Repair",
+        "organisation": "HMEL",
+        "category": "Works",
+        "published_date": "2026-10-01T00:00:00Z",
+        "closing_date": "2026-11-20T10:00:00Z",
+        "relevance_score": 75,
+        "link": "",
+        "status": "new",
+        "raw": {},
+    }
+    db_module.upsert_tender(t_hmel)
+
+    # 4. HMEL (email) tender with empty link
+    t_hmel_email = {
+        "id": "hmel_email:HMEL_EMAIL_66666",
+        "source": "hmel (email)",
+        "title": "HMEL Flare Stack Servicing",
+        "organisation": "HMEL",
+        "category": "Services",
+        "published_date": "2026-10-01T00:00:00Z",
+        "closing_date": "2026-11-20T10:00:00Z",
+        "relevance_score": 70,
+        "link": "",
+        "status": "new",
+        "raw": {},
+    }
+    db_module.upsert_tender(t_hmel_email)
+
+    # 5. GeM tender with empty link
+    t_gem_nolink = {
+        "id": "gem:GEM_2026_B_NOLINK",
+        "source": "gem",
+        "title": "GeM Bid Without Stored Link",
+        "organisation": "BPCL",
+        "category": "Goods",
+        "published_date": "2026-10-01T00:00:00Z",
+        "closing_date": "2026-11-20T10:00:00Z",
+        "relevance_score": 65,
+        "link": "",
+        "status": "new",
+        "raw": {},
+    }
+    db_module.upsert_tender(t_gem_nolink)
+
+    # --- LIST VIEW TESTS ---
+    r_list = client.get("/", headers=auth)
+    assert r_list.status_code == 200
+
+    # Every source label is present in the list
+    assert "GeM" in r_list.text
+    assert "bidplus.gem.gov.in" in r_list.text
+    assert "CPPP" in r_list.text
+    assert "eprocure.gov.in" in r_list.text
+    assert "HMEL" in r_list.text
+    assert "HMEL (email)" in r_list.text
+
+    # Verify specific cards have expected labels
+    gem_card = r_list.text.split(f'data-id="{t_gem["id"]}"')[1].split('</div>\n      </div>')[0]
+    assert "GeM" in gem_card
+    assert "bidplus.gem.gov.in" in gem_card
+    assert 'rel="noopener noreferrer"' in gem_card
+
+    cppp_card = r_list.text.split(f'data-id="{t_cppp["id"]}"')[1].split('</div>\n      </div>')[0]
+    assert "CPPP" in cppp_card
+    assert "eprocure.gov.in" in cppp_card
+    assert 'rel="noopener noreferrer"' in cppp_card
+
+    hmel_card = r_list.text.split(f'data-id="{t_hmel["id"]}"')[1].split('</div>\n      </div>')[0]
+    assert "HMEL" in hmel_card
+    assert "hmeleprocurement.mjunction.in" in hmel_card
+
+    # --- DETAIL VIEW TESTS ---
+    # (a) GeM detail view
+    r_detail_gem = client.get(f"/tenders/{t_gem['id']}", headers=auth)
+    assert r_detail_gem.status_code == 200
+    assert "🌐 Source" in r_detail_gem.text
+    assert "GeM" in r_detail_gem.text
+    assert "bidplus.gem.gov.in" in r_detail_gem.text
+    assert "GEM/2026/B/99999" in r_detail_gem.text
+    assert "Copy" in r_detail_gem.text
+    assert "First seen" in r_detail_gem.text
+    assert "Last checked on portal" in r_detail_gem.text
+    assert "Open bid document" in r_detail_gem.text
+    assert t_gem["link"] in r_detail_gem.text
+    assert "Open GeM bid list" in r_detail_gem.text
+    assert "https://bidplus.gem.gov.in/all-bids" in r_detail_gem.text
+    assert "Paste the bid number to find it" in r_detail_gem.text
+
+    # (b) CPPP detail view
+    r_detail_cppp = client.get(f"/tenders/{t_cppp['id']}", headers=auth)
+    assert r_detail_cppp.status_code == 200
+    assert "🌐 Source" in r_detail_cppp.text
+    assert "CPPP" in r_detail_cppp.text
+    assert "eprocure.gov.in" in r_detail_cppp.text
+    assert "Open bid document" in r_detail_cppp.text
+    assert t_cppp["link"] in r_detail_cppp.text
+    assert "Open CPPP latest tenders" in r_detail_cppp.text
+    assert "https://eprocure.gov.in/cppp/latestactivetendersnew/cpppdata" in r_detail_cppp.text
+    assert "Paste the bid number to find it" in r_detail_cppp.text
+
+    # (c) HMEL detail view
+    r_detail_hmel = client.get(f"/tenders/{t_hmel['id']}", headers=auth)
+    assert r_detail_hmel.status_code == 200
+    assert "🌐 Source" in r_detail_hmel.text
+    assert "HMEL" in r_detail_hmel.text
+    assert "hmeleprocurement.mjunction.in" in r_detail_hmel.text
+    assert "Requires Swamina's HMEL login" in r_detail_hmel.text
+    assert "Open HMEL portal" in r_detail_hmel.text
+    assert "https://hmeleprocurement.mjunction.in/epspropartner/hmel/login-screen" in r_detail_hmel.text
+    assert "No link stored" in r_detail_hmel.text
+    assert "Open bid document" not in r_detail_hmel.text
+
+    # (d) Row with an empty link shows "No link stored" and no "Open bid document" button
+    r_detail_nolink = client.get(f"/tenders/{t_gem_nolink['id']}", headers=auth)
+    assert r_detail_nolink.status_code == 200
+    assert "No link stored" in r_detail_nolink.text
+    assert "Open bid document" not in r_detail_nolink.text
+
+    # (e) Check all external links carry rel="noopener noreferrer"
+    import re
+    for html in [r_list.text, r_detail_gem.text, r_detail_cppp.text, r_detail_hmel.text]:
+        for m in re.finditer(r'<a\s+[^>]*href=["\'](http[^"\']+)["\'][^>]*>', html):
+            tag = m.group(0)
+            assert 'rel="noopener noreferrer"' in tag, f"External link missing rel in: {tag}"
+
+
+def test_dashboard_and_data_quality_fixes(tmp_path):
+    """Verify instant reload, renamed tier A, review lane filter, single-tender badge, freshness note, and verification sheet."""
+    client = TestClient(app)
+    auth = _get_auth_header()
+
+    # 1. Seed a single tender and a review lane tender
+    t_single = {
+        "id": "gem:GEM_2026_B_SINGLE",
+        "source": "gem",
+        "title": "SINGLE TENDER FOR SUPPLY & INSTALLATION OF TEMERATURE TRANSMITTER FOR MSV-03 AT RAJKOT LPG PLANT",
+        "organisation": "IOCL",
+        "category": "Goods",
+        "published_date": "2026-10-01T00:00:00Z",
+        "closing_date": "2026-11-20T10:00:00Z",
+        "relevance_score": 75,
+        "tier": "A",
+        "link": "https://bidplus.gem.gov.in/showbidDocument/SINGLE",
+        "status": "new",
+        "raw": {},
+    }
+    db_module.upsert_tender(t_single)
+
+    t_review = {
+        "id": "gem:GEM_2026_B_REVIEW",
+        "source": "gem",
+        "title": "Supply of Electromagnetic Flow Meter with flange end connection",
+        "organisation": "OIL INDIA Limited",
+        "category": "Goods",
+        "published_date": "2026-10-01T00:00:00Z",
+        "closing_date": "2026-11-20T10:00:00Z",
+        "relevance_score": 25,
+        "tier": "B",
+        "buyer_match": 1,
+        "link": "https://bidplus.gem.gov.in/showbidDocument/REVIEW",
+        "status": "new",
+        "raw": {},
+    }
+    db_module.upsert_tender(t_review)
+    with db_module.get_conn() as conn:
+        conn.execute("UPDATE tenders SET buyer_match = 1 WHERE id = ?", (t_review["id"],))
+
+    # 2. Check list page
+    r_list = client.get("/", headers=auth)
+    assert r_list.status_code == 200
+
+    # Renamed Tier A option
+    assert "Tier A (relevant, oil/gas buyer)" in r_list.text
+    assert "Tier A (score 70+)" not in r_list.text
+
+    # Review lane option
+    assert "Oil/gas buyer, supply tender (needs review)" in r_list.text
+
+    # onchange="this.form.submit()" on filter selects
+    assert 'id="tier" name="tier" onchange="this.form.submit()"' in r_list.text
+    assert 'id="source" name="source" onchange="this.form.submit()"' in r_list.text
+    assert 'id="closing_window" name="closing_window" onchange="this.form.submit()"' in r_list.text
+    assert 'id="eligibility" name="eligibility" onchange="this.form.submit()"' in r_list.text
+    assert 'id="match_basis" name="match_basis" onchange="this.form.submit()"' in r_list.text
+
+    # Single tender badge in list
+    assert "Single tender" in r_list.text
+
+    # 3. Check review lane filter: tier=buyer_match
+    r_review = client.get("/?tier=buyer_match", headers=auth)
+    assert r_review.status_code == 200
+    assert "Supply of Electromagnetic Flow Meter" in r_review.text
+
+    # 4. Check detail page for t_single
+    r_detail = client.get(f"/tenders/{t_single['id']}", headers=auth)
+    assert r_detail.status_code == 200
+    # Single tender badge in detail panel
+    assert "Single tender" in r_detail.text
+    # Freshness note in Source card
+    assert "Last refresh" in r_detail.text
+    assert "Not verified live. Confirm on the portal before bidding." in r_detail.text
+    # Does not claim live deadline
+    assert "Live deadline" not in r_detail.text
+
+    # 5. Check CSV export contains single_tender column and value
+    r_csv = client.get("/export?tier=all", headers=auth)
+    assert r_csv.status_code == 200
+    csv_lines = r_csv.text.splitlines()
+    assert "single_tender" in csv_lines[0]
+
+    # 6. Test verification sheet script
+    from scripts.make_verification_sheet import generate_verification_sheet
+    test_csv = tmp_path / "test_verification_sheet.csv"
+    generate_verification_sheet(test_csv)
+    assert test_csv.exists()
+    content = test_csv.read_text(encoding="utf-8").splitlines()
+    assert "id,source,bid_number,portal_link,title,organisation,closing_date_IST,quantity,emd,min_turnover_lakh,years_experience,portal_closing,portal_emd,portal_other,match_yes_no,notes" in content[0]
+
+
+def test_settings_page_and_hmel_management(tmp_path, monkeypatch):
+    """Verify settings page rendering, HMEL credential updating, lockout clearing, and refresh action."""
+    client = TestClient(app)
+    auth = _get_auth_header()
+
+    # 1. GET /settings renders successfully
+    r = client.get("/settings", headers=auth)
+    assert r.status_code == 200
+    assert "Portal Settings" in r.text
+    assert "GeM Portal" in r.text
+    assert "CPPP Portal" in r.text
+    assert "HMEL Portal" in r.text
+    assert "hmeleprocurement.mjunction.in" in r.text
+    assert "HMEL mjunction Login Credentials" in r.text
+    assert "Fetch HMEL Tenders Now" in r.text
+
+    # 2. POST /settings/hmel updates credentials
+    test_env = tmp_path / ".env"
+    test_env.write_text("DASHBOARD_USER=swamina\nDASHBOARD_PASSWORD=test\nHMEL_USERNAME=old_user\nHMEL_PASSWORD=old_pass\n", encoding="utf-8")
+    import tender_mcp.config as cfg
+    monkeypatch.setattr(cfg, "ENV_PATH", test_env)
+
+    r_post = client.post(
+        "/settings/hmel",
+        data={"username": "new_vendor_123", "password": "secure_password_abc"},
+        headers=auth,
+        follow_redirects=True,
+    )
+    assert r_post.status_code == 200
+    assert "HMEL mjunction credentials saved successfully" in r_post.text
+    u, p = cfg.get_hmel_credentials()
+    assert u == "new_vendor_123"
+    assert p == "secure_password_abc"
+    # Never expose plain password on page
+    assert "secure_password_abc" not in r_post.text
+
+    # 3. Lockout handling
+    from tender_mcp.config import lock_hmel
+    lock_hmel("Simulated test lockout")
+    r_locked = client.get("/settings", headers=auth)
+    assert "LOCKED" in r_locked.text
+    assert "Clear Lockout Protection" in r_locked.text
+
+    r_unlock = client.post("/settings/hmel/unlock", headers=auth, follow_redirects=True)
+    assert r_unlock.status_code == 200
+    assert "lockout protection cleared" in r_unlock.text
+
+    # 4. Clear session
+    from scrapers.hmel import STATE_PATH
+    STATE_PATH.write_text("{}", encoding="utf-8")
+    assert STATE_PATH.exists()
+    r_clear = client.post("/settings/hmel/clear-session", headers=auth, follow_redirects=True)
+    assert r_clear.status_code == 200
+    assert not STATE_PATH.exists()
+
+    # 5. Scrape trigger
+    mock_tenders = [{
+        "id": "hmel:HMEL_TEST_MOCK_1",
+        "source": "hmel",
+        "title": "HMEL Flare Gas System Spares",
+        "organisation": "HMEL",
+        "category": "Goods",
+        "published_date": "2026-10-01T00:00:00Z",
+        "closing_date": "2026-11-20T10:00:00Z",
+        "relevance_score": 85,
+        "status": "new",
+        "raw": {},
+    }]
+    from unittest.mock import AsyncMock
+    with patch("tender_mcp.refresh._run_hmel", new_callable=AsyncMock) as mock_hmel:
+        mock_hmel.return_value = (mock_tenders, None)
+        r_refresh = client.post("/settings/hmel/refresh", headers=auth, follow_redirects=True)
+        assert r_refresh.status_code == 200
+        assert "HMEL fetch complete" in r_refresh.text
+        assert "Retrieved 1" in r_refresh.text
+
+    # Verify tender is in DB
+    stored = db_module.get_tender_by_id("hmel:HMEL_TEST_MOCK_1")
+    assert stored is not None
+    assert stored["title"] == "HMEL Flare Gas System Spares"
+
+
+
 
 
 

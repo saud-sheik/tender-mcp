@@ -845,4 +845,205 @@ def test_buyer_match_lane():
     assert r6["tier"] == "A"
 
 
+def test_lane_exclusions_and_test_bids():
+    """Test the 5 specific bids and lane_exclude rules for buyer_match."""
+    from tender_mcp.matcher import score_tender, is_single_tender
+
+    # 1. Cochin LPG stationery bid -> 0
+    b1 = score_tender({
+        "title": "Supply of stationery items at Cochin LPG Plant",
+        "organisation": "Bharat Petroleum Corporation Limited",
+    })
+    assert b1["buyer_match"] == 0
+
+    # 2. BPCL admin-building furniture bid -> 0
+    b2 = score_tender({
+        "title": "Supply of furniture for BPCL admin-building",
+        "organisation": "Bharat Petroleum Corporation Limited",
+    })
+    assert b2["buyer_match"] == 0
+
+    # 3. Supply of vehicle at Mumbai, Rasayani and Nashik -> 0
+    b3 = score_tender({
+        "title": "Supply of vehicle at Mumbai, Rasayani and Nashik",
+        "organisation": "Bharat Petroleum Corporation Limited",
+    })
+    assert b3["buyer_match"] == 0
+
+    # 4. Supply of Electromagnetic Flow Meter with flange end connection -> 1
+    b4 = score_tender({
+        "title": "Supply of Electromagnetic Flow Meter with flange end connection",
+        "organisation": "Indian Oil Corporation Limited",
+    })
+    assert b4["buyer_match"] == 1
+
+    # 5. Procurement of coalescer, separator and micro filter elements for filtration of ATF -> 1
+    b5 = score_tender({
+        "title": "Procurement of coalescer, separator and micro filter elements for filtration of ATF",
+        "organisation": "Indian Oil Corporation Limited",
+    })
+    assert b5["buyer_match"] == 1
+
+
+def test_single_tender_flag():
+    """Verify single tender detection in title and fields without changing score."""
+    from tender_mcp.matcher import score_tender, is_single_tender
+
+    t = {
+        "title": "SINGLE TENDER FOR SUPPLY & INSTALLATION OF TEMERATURE TRANSMITTER FOR MSV-03 AT RAJKOT LPG PLANT",
+        "organisation": "Indian Oil Corporation Limited",
+    }
+    assert is_single_tender(t) is True
+    res = score_tender(t)
+    assert res["is_single_tender"] is True
+    # Verify score is determined normally from keywords (not altered by single tender flag)
+    assert res["score"] >= 70
+
+
+def test_mr_title_and_category_detection():
+    """Verify detection of MR boilerplate titles and generic vs specific PDF item categories."""
+    from tender_mcp.matcher import check_mr_title_and_category
+
+    # Generic MR titles
+    res1 = check_mr_title_and_category(
+        title="Supply of MR Item no. 01.0001 as per MR",
+        item_category="Supply of MR Item no. 01.0001 as per MR",
+        pdf_parse_status="ok",
+    )
+    assert res1["is_mr_title"] is True
+    assert res1["pdf_read"] is True
+    assert res1["is_generic_category"] is True
+
+    # Generic MR with service charges and per diem
+    res2 = check_mr_title_and_category(
+        title="Supply of Group-A1, MR Item no. 01.001 and 01.002[ Tag: 1P39A-MGN-1675 A/B], Transportation charges",
+        item_category="Supply of Group-A1, MR Item no. 01.001 and 01.002[ Tag: 1P39A-MGN-1675 A/B] , Transportation charges for Group- A1, For[ Tag: 1P39A-MGN-1675 A/B] , Per diem Supervision Charges for Group-A1, For Tag: 1P39A-MGN-1675 A/B",
+        pdf_parse_status="ok",
+    )
+    assert res2["is_mr_title"] is True
+    assert res2["is_generic_category"] is True
+
+    # Non-generic: mentions real physical item (Vortexflowmeter)
+    res3 = check_mr_title_and_category(
+        title="Supply of MR Item Sl. No.1.0001 for Group A of MR for Vortexflowmeter",
+        item_category="Group B of MR for Vortexflowmeter",
+        pdf_parse_status="ok",
+    )
+    assert res3["is_mr_title"] is True
+    assert res3["is_generic_category"] is False
+    assert "Vortexflowmeter" in res3["pdf_item_category"]
+
+    # Not an MR title
+    res4 = check_mr_title_and_category(
+        title="Procurement of Ball Valves",
+        item_category="Ball Valves",
+        pdf_parse_status="ok",
+    )
+    assert res4["is_mr_title"] is False
+
+
+def test_buyer_match_tier_b_with_scores_25_and_0():
+    """Verify that a tender with buyer_match = 1 is tier B with relevance_score 25 and score 0."""
+    from tender_mcp.matcher import compute_tier, score_tender
+
+    # compute_tier directly: buyer_match=True forces tier B regardless of weak-term or zero score
+    assert compute_tier(25, "Indian Oil Corporation Limited", buyer_match=True) == "B"
+    assert compute_tier(0, "Hindustan Petroleum Corporation Limited", buyer_match=True) == "B"
+
+    # score_tender with buyer_match = 1 and weak-term relevance_score 25
+    t25 = {
+        "title": "Supply of Electromagnetic Flow Meter with flange end connection",
+        "organisation": "Indian Oil Corporation Limited",
+    }
+    res25 = score_tender(t25)
+    assert res25["buyer_match"] == 1
+    assert res25["score"] == 25
+    assert res25["tier"] == "B"
+
+    # score_tender with buyer_match = 1 and relevance_score 0
+    t0 = {
+        "title": "SUPPLY OF SUREFLOW 17 FOR HP-COAT PROJECT",
+        "organisation": "Hindustan Petroleum Corporation Limited",
+    }
+    res0 = score_tender(t0)
+    assert res0["buyer_match"] == 1
+    assert res0["score"] == 0
+    assert res0["tier"] == "B"
+
+
+def test_tier_logic_one_order_real_titles_table():
+    """Verify fixed-order tier logic across 11 real titles test table."""
+    from tender_mcp.matcher import score_tender
+
+    test_cases = [
+        {
+            "title": "Supply of Air Booster for pneumatic testing of LPG cylinder at BPCL Cherlapalli LPG Plant",
+            "organisation": "Bharat Petroleum Corporation Limited",
+            "expected_tier": "A",
+        },
+        {
+            "title": "Procurement of Reciprocating Plunger Pump (Crude Oil Despatch Application)",
+            "organisation": "Indian Oil Corporation Limited",
+            "expected_tier": "A",
+        },
+        {
+            "title": "Supply of Above Ground Header Pipelines for Tank Lorry Filling Gantry",
+            "organisation": "Bharat Petroleum Corporation Limited",
+            "expected_tier": "A",
+        },
+        {
+            "title": "Procurement of Gasoline Multifunctional Additive (SPEED Additive)",
+            "organisation": "Bharat Petroleum Corporation Limited",
+            "expected_tier": "A",
+        },
+        {
+            "title": "Custom Bid for Services - Pipeline Monitoring, ROU surveillence for Mumbai Manmad Bijwasan Pipeline",
+            "organisation": "Bharat Petroleum Corporation Limited",
+            "similar_category": "Security Manpower Service",
+            "expected_tier": "B",
+        },
+        {
+            "title": "PROVIDING FIREFIGHTING SYSTEM MAINTENANCE SERVICES AT COIMBATORE LPG PLANT",
+            "organisation": "Bharat Petroleum Corporation Limited",
+            "similar_category": "Manpower Outsourcing",
+            "expected_tier": "B",
+        },
+        {
+            "title": "Provision of drinking water in shed at Mangalore LPG Plant",
+            "organisation": "Bharat Petroleum Corporation Limited",
+            "expected_tier": "B",
+        },
+        {
+            "title": "Supply of Electromagnetic Flow Meter with flange end connection",
+            "organisation": "Oil India Limited",
+            "expected_tier": "B",
+        },
+        {
+            "title": "Custom Bid for Services - Providing Manpower Services at Nasik LPG Plant",
+            "organisation": "Bharat Petroleum Corporation Limited",
+            "expected_tier": "C",
+        },
+        {
+            "title": "Housekeeping services at LPG plant",
+            "organisation": "Bharat Petroleum Corporation Limited",
+            "expected_tier": "C",
+        },
+        {
+            "title": "Procurement of printed logbooks and stationery at Cochin LPG Import Terminal",
+            "organisation": "Bharat Petroleum Corporation Limited",
+            "expected_tier": "C",
+        },
+    ]
+
+    for tc in test_cases:
+        res = score_tender(tc)
+        assert res["tier"] == tc["expected_tier"], (
+            f"Failed on '{tc['title']}': expected {tc['expected_tier']}, got {res['tier']} (score={res['score']}, basis={res['match_basis']}, noise={res.get('category_noise_reason')})"
+        )
+
+
+
+
+
+
 

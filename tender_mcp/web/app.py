@@ -10,9 +10,12 @@ Provides:
 """
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+import asyncio
 import csv
 import io
 import json
+import logging
 import secrets
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,7 +27,19 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Stre
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from tender_mcp.config import get_dashboard_credentials, get_dashboard_owners
+from tender_mcp.config import (
+    get_dashboard_credentials,
+    get_dashboard_owners,
+    get_hmel_credentials,
+    set_hmel_credentials,
+    is_hmel_locked,
+    unlock_hmel,
+    mask_credential,
+    get_slack_webhook_url,
+    set_slack_webhook_url,
+    get_auto_refresh_interval,
+    set_auto_refresh_interval,
+)
 from tender_mcp.dates import get_hours_to_close, to_ist_display
 from tender_mcp.db import (
     VALID_STATUSES,
@@ -33,8 +48,13 @@ from tender_mcp.db import (
     get_tender_by_id,
     get_tender_status_history,
     update_tender_status,
+    toggle_tender_watched,
+    set_tender_watched,
+    get_watched_tenders,
 )
-from tender_mcp.matcher import compute_bid_window
+from tender_mcp.matcher import compute_bid_window, is_single_tender, check_mr_title_and_category
+
+logger = logging.getLogger(__name__)
 
 # Verify credentials on module load / startup
 USER, PASSWORD = get_dashboard_credentials()
@@ -43,7 +63,20 @@ if not USER or not PASSWORD:
         "DASHBOARD_USER and DASHBOARD_PASSWORD must be set in .env to start the dashboard."
     )
 
-app = FastAPI(title="Swamina Tender Aggregator Dashboard")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global _auto_refresh_task
+    _auto_refresh_task = asyncio.create_task(_background_scheduler_loop())
+    yield
+    if _auto_refresh_task and not _auto_refresh_task.done():
+        _auto_refresh_task.cancel()
+        try:
+            await _auto_refresh_task
+        except asyncio.CancelledError:
+            pass
+
+
+app = FastAPI(title="Swamina Tender Aggregator Dashboard", lifespan=lifespan)
 security = HTTPBasic()
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
@@ -51,6 +84,7 @@ jinja_env = Environment(
     loader=FileSystemLoader(str(TEMPLATES_DIR)),
     autoescape=select_autoescape(["html", "xml"]),
 )
+jinja_env.filters["to_ist"] = to_ist_display
 
 
 def verify_auth(credentials: HTTPBasicCredentials = Depends(security)) -> str:
@@ -151,12 +185,20 @@ def query_filtered_tenders(
     params = []
 
     if tier and tier != "all":
-        clauses.append("tier = ?")
-        params.append(tier)
+        if tier == "buyer_match":
+            clauses.append("buyer_match = 1")
+        elif tier == "watched":
+            clauses.append("is_watched = 1")
+        else:
+            clauses.append("tier = ?")
+            params.append(tier)
 
     if status_filter and status_filter != "all":
-        clauses.append("status = ?")
-        params.append(status_filter)
+        if status_filter == "watched":
+            clauses.append("is_watched = 1")
+        else:
+            clauses.append("status = ?")
+            params.append(status_filter)
 
     if tender_kind:
         if tender_kind in ("product", "products", "products only", "products_only"):
@@ -174,8 +216,11 @@ def query_filtered_tenders(
         params.append(source)
 
     if match_basis and match_basis != "all":
-        clauses.append("match_basis = ?")
-        params.append(match_basis)
+        if match_basis == "buyer_match":
+            clauses.append("buyer_match = 1")
+        else:
+            clauses.append("match_basis = ?")
+            params.append(match_basis)
 
     if extended_only:
         clauses.append("(is_extended = 1 OR date_check IN ('extended_auto', 'extended_by_corrigendum'))")
@@ -185,9 +230,9 @@ def query_filtered_tenders(
         params.append(eligibility)
 
     if q.strip():
-        clauses.append("(title LIKE ? OR organisation LIKE ? OR item_category LIKE ? OR matched_terms LIKE ?)")
+        clauses.append("(title LIKE ? OR organisation LIKE ? OR item_category LIKE ? OR matched_terms LIKE ? OR bid_number LIKE ? OR id LIKE ?)")
         term = f"%{q.strip()}%"
-        params.extend([term, term, term, term])
+        params.extend([term, term, term, term, term, term])
 
     # Base query sorted by closing_date asc
     where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
@@ -197,22 +242,33 @@ def query_filtered_tenders(
         rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
 
     # Post-process hours left, window, and min_hours filter
+    # Review lane ("buyer_match") shows all open tenders regardless of 24h cutoff
+    effective_min_hours = 0.0 if (tier == "buyer_match" or match_basis == "buyer_match") else min_hours
     results = []
     for r in rows:
         htc = get_hours_to_close(r.get("closing_date"))
         r["hours_to_close"] = htc
         r["bid_window"] = compute_bid_window(htc)
         r["closing_ist"] = to_ist_display(r.get("closing_date", ""))
+        r["is_single_tender"] = is_single_tender(r)
 
-        # Default view: open tenders closing in more than 24 hours
-        if min_hours is not None:
-            if htc is None or htc < min_hours:
+        mr_info = check_mr_title_and_category(r.get("title"), r.get("item_category"), r.get("pdf_parse_status"))
+        r["is_mr_title"] = mr_info["is_mr_title"]
+        r["pdf_item_category"] = mr_info["pdf_item_category"]
+        r["is_generic_category"] = mr_info["is_generic_category"]
+
+        # Default view: open tenders closing in more than 24 hours (or open if effective_min_hours is 0.0)
+        if effective_min_hours is not None:
+            if htc is None or htc < effective_min_hours:
                 continue
 
         # Closing window filter
         if closing_window and closing_window != "all":
             if r["bid_window"] != closing_window:
                 continue
+
+        for c in ("emd_value", "tender_value", "possible_latest_end_utc"):
+            r.pop(c, None)
 
         results.append(r)
 
@@ -281,20 +337,25 @@ def list_page(
     }
     export_query = urlencode(export_params)
 
-    # Compute status counts for KPI stat cards
-    all_tenders_for_counts = query_filtered_tenders(tier="all", min_hours=None)
+    # Compute status counts for KPI stat cards (OPEN tenders closing in the future)
+    all_stored = query_filtered_tenders(tier="all", min_hours=None)
+    open_tenders = [t for t in all_stored if t.get("hours_to_close") is not None and t.get("hours_to_close") >= 0.0]
     status_counts = {
-        "all": len(all_tenders_for_counts),
+        "all": len(open_tenders),
+        "total_stored": len(all_stored),
         "new": 0,
         "interested": 0,
         "bidding": 0,
         "submitted": 0,
         "skipped": 0,
+        "watched": 0,
     }
-    for t in all_tenders_for_counts:
+    for t in open_tenders:
         st = t.get("status")
-        if st in status_counts and st != "all":
+        if st in status_counts and st not in ("all", "total_stored", "watched"):
             status_counts[st] += 1
+        if t.get("is_watched"):
+            status_counts["watched"] += 1
 
     rendered = template.render(
         tenders=tenders,
@@ -338,19 +399,33 @@ def export_csv(
 
     output = io.StringIO()
     fieldnames = [
-        "id", "source", "title", "organisation", "tier", "tender_kind", "buyer_match", "buyer_match_label", "status", "owner",
+        "id", "source", "title", "organisation", "tier", "tender_kind", "is_watched", "single_tender", "buyer_match", "buyer_match_label", "status", "owner",
         "relevance_score", "matched_terms", "closing_date", "closing_ist", "hours_to_close",
-        "is_extended", "date_check", "extensions_seen", "emd_value", "estimated_bid_value_inr",
-        "floor_price_inr_min", "floor_price_inr_max", "buyer_overrides_gem_fields",
+        "is_extended", "date_check", "extensions_seen", "emd_display", "estimated_bid_value_inr",
+        "floor_price_inr_min", "floor_price_inr_max", "buyer_overrides_gem_fields", "buyer_overrides_badge",
         "similar_category", "category_noise_reason", "notes"
     ]
     writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
     writer.writeheader()
     for t in tenders:
+        t["single_tender"] = 1 if (t.get("is_single_tender") or is_single_tender(t)) else 0
         if t.get("buyer_match"):
             t["buyer_match_label"] = "Oil/gas buyer, supply tender"
         else:
             t["buyer_match_label"] = ""
+        if t.get("emd_amount_inr"):
+            t["emd_display"] = f"₹{t['emd_amount_inr']:,.0f}"
+        elif t.get("emd_amount_inr_min") and t.get("emd_amount_inr_max") and t.get("emd_amount_inr_min") == t.get("emd_amount_inr_max"):
+            t["emd_display"] = f"₹{t['emd_amount_inr_min']:,.0f} per schedule"
+        elif t.get("emd_amount_inr_min") or t.get("emd_amount_inr_max"):
+            t["emd_display"] = f"₹{t.get('emd_amount_inr_min', 0):,.0f} - ₹{t.get('emd_amount_inr_max', 0):,.0f}"
+        else:
+            t["emd_display"] = "Nil / Exempt"
+
+        if t.get("buyer_overrides_gem_fields"):
+            t["buyer_overrides_badge"] = "EMD/turnover in buyer documents"
+        else:
+            t["buyer_overrides_badge"] = ""
         writer.writerow(t)
 
     output.seek(0)
@@ -421,6 +496,28 @@ def detail_page(
     tender["closing_ist"] = to_ist_display(tender.get("closing_date", ""))
     tender["original_end_ist"] = to_ist_display(tender.get("original_end_utc", ""))
     tender["auto_extension_limit_ist"] = to_ist_display(tender.get("auto_extension_limit_utc", ""))
+    tender["first_seen_ist"] = to_ist_display(tender.get("first_seen_at", ""))
+    tender["last_seen_ist"] = to_ist_display(tender.get("last_seen_at", ""))
+    tender["is_single_tender"] = is_single_tender(tender)
+    mr_info = check_mr_title_and_category(tender.get("title"), tender.get("item_category"), tender.get("pdf_parse_status"))
+    tender["is_mr_title"] = mr_info["is_mr_title"]
+    tender["pdf_item_category"] = mr_info["pdf_item_category"]
+    tender["is_generic_category"] = mr_info["is_generic_category"]
+
+    for c in ("emd_value", "tender_value", "possible_latest_end_utc"):
+        tender.pop(c, None)
+
+    bid_no = tender.get("bid_no") or tender.get("bid_number")
+    raw = tender.get("raw")
+    if not bid_no and isinstance(raw, dict):
+        bid_no = raw.get("bid_no") or raw.get("bid_number") or raw.get("tender_id")
+    if not bid_no and ":" in str(tender.get("id", "")):
+        raw_id = tender["id"].split(":", 1)[1]
+        if tender.get("source") == "gem" and raw_id.startswith("GEM_"):
+            bid_no = raw_id.replace("_", "/")
+        else:
+            bid_no = raw_id
+    tender["bid_number"] = bid_no or tender.get("id", "")
 
     status_history = get_tender_status_history(tender_id)
     closing_history = get_closing_date_history(tender_id)
@@ -462,3 +559,270 @@ def update_status(
         raise HTTPException(status_code=404, detail="Tender not found")
 
     return RedirectResponse(url=f"/tenders/{tender_id}", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Settings & Portal Credentials Management
+# ---------------------------------------------------------------------------
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(
+    message: str | None = None,
+    msg_type: str | None = None,
+    user_auth: str = Depends(verify_auth),
+) -> HTMLResponse:
+    """Settings page for configuring portal credentials, especially HMEL/mjunction."""
+    template = jinja_env.get_template("settings.html")
+    health = get_health_data()
+
+    with get_conn() as conn:
+        rows = conn.execute("SELECT source, count(*) FROM tenders GROUP BY source").fetchall()
+        counts_dict = {str(r[0]).lower(): r[1] for r in rows}
+
+    counts = {
+        "gem": counts_dict.get("gem", 0),
+        "cppp": counts_dict.get("cppp", 0),
+        "hmel": counts_dict.get("hmel", 0) + counts_dict.get("hmel_email", 0) + counts_dict.get("hmel (email)", 0),
+    }
+
+    from scrapers.hmel import STATE_PATH
+    hmel_user, hmel_pass = get_hmel_credentials()
+    is_locked, lock_reason = is_hmel_locked()
+    has_session = STATE_PATH.exists()
+
+    hmel_info = {
+        "configured": bool(hmel_user and hmel_pass),
+        "username_masked": mask_credential(hmel_user) if hmel_user else "",
+        "raw_username": hmel_user,
+        "is_locked": is_locked,
+        "lock_reason": lock_reason,
+        "has_session": has_session,
+    }
+
+    slack_url = get_slack_webhook_url()
+    slack_info = {
+        "configured": bool(slack_url),
+        "url_masked": mask_credential(slack_url) if slack_url else "",
+        "raw_url": slack_url,
+    }
+
+    scheduler_minutes = get_auto_refresh_interval()
+    scheduler_info = {
+        "interval_minutes": scheduler_minutes,
+        "is_active": scheduler_minutes > 0,
+    }
+
+    rendered = template.render(
+        health=health,
+        counts=counts,
+        hmel=hmel_info,
+        slack=slack_info,
+        scheduler=scheduler_info,
+        message=message,
+        msg_type=msg_type or "info",
+    )
+    return HTMLResponse(rendered)
+
+
+@app.post("/settings/hmel")
+def update_hmel_settings(
+    username: str = Form(""),
+    password: str = Form(""),
+    user_auth: str = Depends(verify_auth),
+) -> RedirectResponse:
+    """Save HMEL credentials to local .env and environment."""
+    from urllib.parse import quote_plus
+
+    if not username.strip() and not password.strip():
+        msg = quote_plus("No credentials provided.")
+        return RedirectResponse(url=f"/settings?message={msg}&msg_type=error", status_code=303)
+
+    set_hmel_credentials(username=username, password=password)
+    msg = quote_plus("HMEL mjunction credentials saved successfully to .env.")
+    return RedirectResponse(url=f"/settings?message={msg}&msg_type=success", status_code=303)
+
+
+@app.post("/settings/hmel/unlock")
+def unlock_hmel_settings(
+    user_auth: str = Depends(verify_auth),
+) -> RedirectResponse:
+    """Clear .hmel_locked lockout protection."""
+    from urllib.parse import quote_plus
+    unlocked = unlock_hmel()
+    if unlocked:
+        msg = quote_plus("HMEL account lockout protection cleared.")
+        msg_type = "success"
+    else:
+        msg = quote_plus("No active HMEL lockout file found.")
+        msg_type = "info"
+    return RedirectResponse(url=f"/settings?message={msg}&msg_type={msg_type}", status_code=303)
+
+
+@app.post("/settings/hmel/clear-session")
+def clear_session_settings(
+    user_auth: str = Depends(verify_auth),
+) -> RedirectResponse:
+    """Remove playwright_state.json to force a fresh login on next scrape."""
+    from scrapers.hmel import STATE_PATH
+    from urllib.parse import quote_plus
+    if STATE_PATH.exists():
+        STATE_PATH.unlink(missing_ok=True)
+        msg = quote_plus("Saved browser session cleared. Next scraper run will perform a fresh login.")
+        msg_type = "info"
+    else:
+        msg = quote_plus("No saved session file to clear.")
+        msg_type = "info"
+    return RedirectResponse(url=f"/settings?message={msg}&msg_type={msg_type}", status_code=303)
+
+
+@app.post("/settings/hmel/refresh")
+async def refresh_hmel_settings(
+    user_auth: str = Depends(verify_auth),
+) -> RedirectResponse:
+    """Trigger HMEL scraper and ingest live tenders into database."""
+    from tender_mcp.refresh import _run_hmel
+    from tender_mcp.db import upsert_tender
+    from urllib.parse import quote_plus
+
+    tenders, err = await _run_hmel()
+    if err:
+        msg = quote_plus(f"HMEL scrape failed: {err}")
+        return RedirectResponse(url=f"/settings?message={msg}&msg_type=error", status_code=303)
+
+    new_count = 0
+    updated_count = 0
+    for t in tenders:
+        _, is_new = upsert_tender(t)
+        if is_new:
+            new_count += 1
+        else:
+            updated_count += 1
+
+    msg = quote_plus(f"HMEL fetch complete! Retrieved {len(tenders)} tenders ({new_count} new, {updated_count} updated).")
+    return RedirectResponse(url=f"/settings?message={msg}&msg_type=success", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Watchlist Endpoint
+# ---------------------------------------------------------------------------
+
+@app.post("/tenders/{tender_id:path}/toggle-watch")
+def toggle_watch(
+    tender_id: str,
+    redirect_url: str | None = Form(None),
+    user_auth: str = Depends(verify_auth),
+) -> Response:
+    """Toggle is_watched status on a tender. Returns JSON or redirects."""
+    try:
+        new_state = toggle_tender_watched(tender_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Tender not found")
+
+    if redirect_url:
+        return RedirectResponse(url=redirect_url, status_code=303)
+    return JSONResponse({"success": True, "tender_id": tender_id, "is_watched": new_state})
+
+
+# ---------------------------------------------------------------------------
+# Slack & Notification Settings
+# ---------------------------------------------------------------------------
+
+@app.post("/settings/slack")
+def update_slack_settings(
+    webhook_url: str = Form(""),
+    test_alert: int = Form(0),
+    user_auth: str = Depends(verify_auth),
+) -> RedirectResponse:
+    """Save Slack webhook URL and optionally send a test alert."""
+    from urllib.parse import quote_plus
+    from tender_mcp.notifications import send_slack_message
+
+    webhook_url = webhook_url.strip()
+    if webhook_url:
+        set_slack_webhook_url(webhook_url)
+
+    if bool(test_alert):
+        target = webhook_url or get_slack_webhook_url()
+        if not target:
+            msg = quote_plus("Cannot send test alert: No Slack webhook URL configured.")
+            return RedirectResponse(url=f"/settings?message={msg}&msg_type=error", status_code=303)
+        ok = send_slack_message(
+            "🔔 *[Swamina Tender Aggregator]* Test alert received successfully! Instant Slack notifications are active.",
+            webhook_url=target,
+        )
+        if ok:
+            msg = quote_plus("Slack webhook saved and test alert sent successfully!")
+            return RedirectResponse(url=f"/settings?message={msg}&msg_type=success", status_code=303)
+        else:
+            msg = quote_plus("Saved webhook, but test message delivery failed. Please verify the URL.")
+            return RedirectResponse(url=f"/settings?message={msg}&msg_type=error", status_code=303)
+
+    msg = quote_plus("Slack webhook settings saved successfully.")
+    return RedirectResponse(url=f"/settings?message={msg}&msg_type=success", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Background Auto-Refresh Scheduler & Endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/settings/scheduler")
+def update_scheduler_settings(
+    interval_minutes: int = Form(0),
+    user_auth: str = Depends(verify_auth),
+) -> RedirectResponse:
+    """Configure auto-refresh background scheduler interval."""
+    from urllib.parse import quote_plus
+
+    set_auto_refresh_interval(interval_minutes)
+    if interval_minutes > 0:
+        msg = quote_plus(f"Auto-refresh scheduler enabled: will refresh all portals every {interval_minutes} minutes.")
+    else:
+        msg = quote_plus("Auto-refresh scheduler disabled (manual refresh only).")
+    return RedirectResponse(url=f"/settings?message={msg}&msg_type=success", status_code=303)
+
+
+@app.post("/settings/refresh-all")
+async def refresh_all_settings(
+    user_auth: str = Depends(verify_auth),
+) -> RedirectResponse:
+    """Trigger full refresh of GeM, CPPP, and HMEL immediately."""
+    from tender_mcp.refresh import refresh_all
+    from urllib.parse import quote_plus
+
+    try:
+        summary = await refresh_all()
+        total_f = summary.get("total_fetched", 0)
+        total_n = summary.get("total_new", 0)
+        total_u = summary.get("total_updated", 0)
+        msg = quote_plus(f"Full refresh complete: {total_f} tenders processed ({total_n} new, {total_u} updated).")
+        return RedirectResponse(url=f"/settings?message={msg}&msg_type=success", status_code=303)
+    except Exception as exc:
+        msg = quote_plus(f"Full refresh failed: {exc}")
+        return RedirectResponse(url=f"/settings?message={msg}&msg_type=error", status_code=303)
+
+
+_auto_refresh_task: asyncio.Task | None = None
+
+async def _background_scheduler_loop() -> None:
+    """Periodically triggers refresh_all() if AUTO_REFRESH_INTERVAL_MINUTES > 0."""
+    from tender_mcp.refresh import refresh_all
+    logger.info("Background auto-refresh scheduler started.")
+    while True:
+        try:
+            mins = get_auto_refresh_interval()
+            if mins > 0:
+                await asyncio.sleep(mins * 60)
+                if get_auto_refresh_interval() > 0:
+                    logger.info("Auto-refreshing all portals via background scheduler (interval %d min)...", mins)
+                    await refresh_all()
+            else:
+                await asyncio.sleep(30)
+        except asyncio.CancelledError:
+            logger.info("Background auto-refresh loop cancelled.")
+            break
+        except Exception as exc:
+            logger.error("Background auto-refresh encountered error: %s", exc)
+            await asyncio.sleep(60)
+
+
+

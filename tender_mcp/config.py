@@ -34,6 +34,63 @@ else:
     logger.warning(".env file not found at %s", ENV_PATH)
 
 
+def mask_credential(val: str) -> str:
+    """Mask sensitive string showing only first and last characters."""
+    val = (val or "").strip()
+    if not val:
+        return ""
+    if len(val) <= 4:
+        return "*" * len(val)
+    return val[:2] + "*" * (len(val) - 4) + val[-2:]
+
+
+def set_hmel_credentials(username: str, password: str) -> None:
+    """
+    Update HMEL_USERNAME and HMEL_PASSWORD in .env and current os.environ.
+    Only updates fields if a non-empty string is provided.
+    """
+    username = username.strip()
+    password = password.strip()
+
+    if username:
+        os.environ["HMEL_USERNAME"] = username
+    if password:
+        os.environ["HMEL_PASSWORD"] = password
+
+    if not ENV_PATH.exists():
+        ENV_PATH.write_text(f"HMEL_USERNAME={username}\nHMEL_PASSWORD={password}\n", encoding="utf-8")
+        return
+
+    lines = ENV_PATH.read_text(encoding="utf-8").splitlines()
+    new_lines = []
+    found_user = False
+    found_pass = False
+
+    for line in lines:
+        if line.strip().startswith("HMEL_USERNAME="):
+            if username:
+                new_lines.append(f"HMEL_USERNAME={username}")
+            else:
+                new_lines.append(line)
+            found_user = True
+        elif line.strip().startswith("HMEL_PASSWORD="):
+            if password:
+                new_lines.append(f"HMEL_PASSWORD={password}")
+            else:
+                new_lines.append(line)
+            found_pass = True
+        else:
+            new_lines.append(line)
+
+    if username and not found_user:
+        new_lines.insert(0, f"HMEL_USERNAME={username}")
+    if password and not found_pass:
+        insert_idx = 1 if (found_user or username) else 0
+        new_lines.insert(insert_idx, f"HMEL_PASSWORD={password}")
+
+    ENV_PATH.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+
 def get_hmel_credentials() -> tuple[str, str]:
     """
     Read HMEL_USERNAME and HMEL_PASSWORD strictly from local .env at project root.
@@ -192,5 +249,63 @@ def get_digest_first_window_hours() -> int:
         return int(val)
     except ValueError:
         return 24
+
+
+def set_slack_webhook_url(url: str) -> None:
+    """Save SLACK_WEBHOOK_URL to environment and .env."""
+    url = url.strip()
+    os.environ["SLACK_WEBHOOK_URL"] = url
+    if not ENV_PATH.exists():
+        ENV_PATH.write_text(f"SLACK_WEBHOOK_URL={url}\n", encoding="utf-8")
+        return
+
+    lines = ENV_PATH.read_text(encoding="utf-8").splitlines()
+    new_lines = []
+    found = False
+    for line in lines:
+        if line.strip().startswith("SLACK_WEBHOOK_URL="):
+            new_lines.append(f"SLACK_WEBHOOK_URL={url}")
+            found = True
+        else:
+            new_lines.append(line)
+    if not found:
+        new_lines.append(f"SLACK_WEBHOOK_URL={url}")
+    ENV_PATH.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+
+def get_auto_refresh_interval() -> int:
+    """
+    Read AUTO_REFRESH_INTERVAL_MINUTES from environment or local .env.
+    Default is 0 (disabled).
+    """
+    env_dict = dotenv_values(ENV_PATH) if ENV_PATH.exists() else {}
+    val = (os.environ.get("AUTO_REFRESH_INTERVAL_MINUTES") or env_dict.get("AUTO_REFRESH_INTERVAL_MINUTES") or "0").strip()
+    try:
+        return max(0, int(val))
+    except ValueError:
+        return 0
+
+
+def set_auto_refresh_interval(minutes: int) -> None:
+    """Save AUTO_REFRESH_INTERVAL_MINUTES to environment and .env."""
+    mins_str = str(max(0, int(minutes)))
+    os.environ["AUTO_REFRESH_INTERVAL_MINUTES"] = mins_str
+    if not ENV_PATH.exists():
+        ENV_PATH.write_text(f"AUTO_REFRESH_INTERVAL_MINUTES={mins_str}\n", encoding="utf-8")
+        return
+
+    lines = ENV_PATH.read_text(encoding="utf-8").splitlines()
+    new_lines = []
+    found = False
+    for line in lines:
+        if line.strip().startswith("AUTO_REFRESH_INTERVAL_MINUTES="):
+            new_lines.append(f"AUTO_REFRESH_INTERVAL_MINUTES={mins_str}")
+            found = True
+        else:
+            new_lines.append(line)
+    if not found:
+        new_lines.append(f"AUTO_REFRESH_INTERVAL_MINUTES={mins_str}")
+    ENV_PATH.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
 
 

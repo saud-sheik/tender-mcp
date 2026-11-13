@@ -56,6 +56,25 @@
     align-items: center;
     gap: 6px;
   }
+  .badge-source {
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-weight: 600;
+    transition: opacity 0.15s ease;
+  }
+  .badge-source:hover {
+    opacity: 0.85;
+    text-decoration: none;
+  }
+  .badge-source-gem { background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
+  .badge-source-cppp { background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; }
+  .badge-source-hmel, .badge-source-hmel_email { background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+
+  [data-theme="dark"] .badge-source-gem { background: #431407; color: #fdba74; border-color: #9a3412; }
+  [data-theme="dark"] .badge-source-cppp { background: #082f49; color: #7dd3fc; border-color: #0369a1; }
+  [data-theme="dark"] .badge-source-hmel, [data-theme="dark"] .badge-source-hmel_email { background: #3b0764; color: #d8b4fe; border-color: #6b21a8; }
 
   /* Title & Header Section */
   .detail-chips-row {
@@ -301,11 +320,39 @@
         <!-- Chip Row -->
         <div class="detail-chips-row">
           <span class="badge badge-tier-{{ tender.tier }}">Tier {{ tender.tier }}</span>
-          <span class="badge" style="background: var(--border-subtle); color: var(--text-muted);">{{ tender.source|upper }}</span>
+          {% set s_lower = (tender.source or '')|lower %}
+          {% if s_lower == 'gem' %}
+            {% set s_name = 'GeM' %}
+            {% set s_domain = 'bidplus.gem.gov.in' %}
+          {% elif s_lower == 'cppp' %}
+            {% set s_name = 'CPPP' %}
+            {% set s_domain = 'eprocure.gov.in' %}
+          {% elif 'email' in s_lower %}
+            {% set s_name = 'HMEL (email)' %}
+            {% set s_domain = 'hmeleprocurement.mjunction.in' %}
+          {% elif 'hmel' in s_lower %}
+            {% set s_name = 'HMEL' %}
+            {% set s_domain = 'hmeleprocurement.mjunction.in' %}
+          {% else %}
+            {% set s_name = tender.source|upper %}
+            {% set s_domain = '' %}
+          {% endif %}
+          {% if tender.link %}
+            <a href="{{ tender.link }}" target="_blank" rel="noopener noreferrer" class="badge badge-source badge-source-{{ s_lower }}" title="Open on {{ s_domain or s_name }}">
+              {{ s_name }}{% if s_domain %} · {{ s_domain }}{% endif %} <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-left: 2px;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            </a>
+          {% else %}
+            <span class="badge badge-source badge-source-{{ s_lower }}" title="{{ s_domain or s_name }}">
+              {{ s_name }}{% if s_domain %} · {{ s_domain }}{% endif %} <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-left: 2px;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            </span>
+          {% endif %}
           {% if tender.tender_kind %}
             <span class="badge" style="background: var(--border-subtle); color: var(--text-muted);">{{ tender.tender_kind }}</span>
           {% endif %}
           <span class="badge badge-status-{{ tender.status }}">{{ tender.status }}</span>
+          {% if tender.is_single_tender or tender.single_tender %}
+            <span class="badge" style="background: #fef3c7; color: #92400e; border-color: #fde68a;">Single tender</span>
+          {% endif %}
           <span class="badge" style="background: var(--primary-tint); color: var(--primary); border-color: var(--primary);">Score {{ tender.relevance_score }}</span>
 
           {% if tender.is_extended %}
@@ -321,7 +368,7 @@
             <span class="badge" style="background: #e8f5e9; color: #1e7e34; border-color: #c8e6c9;">Oil/gas buyer, supply tender</span>
           {% endif %}
           {% if tender.buyer_overrides_gem_fields %}
-            <span class="badge" style="background: #fee2e2; color: #991b1b; border-color: #fecaca;" title="EMD / turnover set in buyer documents, check them before relying on these numbers">Buyer overrides EMD/Turnover</span>
+            <span class="badge" style="background: #fee2e2; color: #991b1b; border-color: #fecaca;">EMD/turnover in buyer documents</span>
           {% endif %}
           {% if not tender.estimated_bid_value_inr and (tender.floor_price_inr_min or tender.floor_price_inr_max) %}
             <span class="badge" style="background: var(--card-subtle); color: var(--text-muted); border-color: var(--border);">Floor price</span>
@@ -334,9 +381,28 @@
           {% elif tender.eligibility == 'likely_not_eligible' %}
             <span class="badge badge-details-needed">Ineligible</span>
           {% endif %}
+
+          <form method="post" action="/tenders/{{ tender.id }}/toggle-watch" style="margin-left: auto; display: inline-flex;">
+            <input type="hidden" name="redirect_url" value="/tenders/{{ tender.id }}">
+            <button type="submit" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px;" title="{{ 'Remove from Watchlist' if tender.is_watched else 'Star / Add to Watchlist' }}">
+              <span style="font-size: 1.1rem; color: #eab308; line-height: 1;">{{ '★' if tender.is_watched else '☆' }}</span>
+              <span style="font-weight: 600;">{{ 'Watched' if tender.is_watched else 'Watch' }}</span>
+            </button>
+          </form>
         </div>
 
         <h1 class="detail-main-title">{{ tender.title }}</h1>
+        {% if tender.is_mr_title %}
+          {% if tender.pdf_item_category %}
+            <div style="font-size: 0.9rem; color: var(--text-muted); margin-top: 4px; margin-bottom: 8px;">
+              <strong>PDF Item Category:</strong> {{ tender.pdf_item_category }}
+            </div>
+          {% else %}
+            <div style="margin-top: 4px; margin-bottom: 8px;">
+              <span class="badge" style="background: #fef3c7; color: #92400e; border-color: #fde68a;">Details in buyer documents</span>
+            </div>
+          {% endif %}
+        {% endif %}
         <div class="detail-org-name">{{ tender.organisation }}</div>
 
         <!-- Deadline Hero Card -->
@@ -356,17 +422,89 @@
 
           <div class="hero-meta">
             <div class="hero-closing-date">{{ tender.closing_ist }}</div>
-            <div class="hero-closing-label">Live deadline</div>
+            <div class="hero-closing-label">Closing date (IST)</div>
           </div>
         </div>
+      </div>
 
-        {% if tender.link %}
-          <div style="margin-top: 12px;">
-            <a href="{{ tender.link }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
-              Open portal page
-            </a>
+      <!-- Source Card -->
+      <div class="detail-card" id="detail-source-card">
+        <div class="detail-card-title">🌐 Source</div>
+        <div class="kv-grid">
+          <div class="kv-label">Portal</div>
+          <div class="kv-val">
+            {% set s_lower = (tender.source or '')|lower %}
+            {% if s_lower == 'gem' %}
+              <strong>GeM</strong> (bidplus.gem.gov.in)
+            {% elif s_lower == 'cppp' %}
+              <strong>CPPP</strong> (eprocure.gov.in)
+            {% elif 'email' in s_lower %}
+              <strong>HMEL (email)</strong> (hmeleprocurement.mjunction.in)
+            {% elif 'hmel' in s_lower %}
+              <strong>HMEL</strong> (hmeleprocurement.mjunction.in)
+            {% else %}
+              <strong>{{ tender.source|upper }}</strong>
+            {% endif %}
           </div>
-        {% endif %}
+
+          <div class="kv-label">Bid Number</div>
+          <div class="kv-val" style="display: flex; align-items: center; gap: 8px;">
+            {% set b_num = tender.bid_number or (tender.id.split(':', 1)[1] if ':' in (tender.id or '') else tender.id) %}
+            <code style="font-size: 0.9rem; font-weight: 600;">{{ b_num }}</code>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="copyBidNumber('{{ b_num }}', this)" title="Copy bid number to clipboard" style="padding: 2px 8px; font-size: 0.75rem;">
+              📋 Copy
+            </button>
+          </div>
+
+          <div class="kv-label">First seen</div>
+          <div class="kv-val">{{ tender.first_seen_ist or (to_ist(tender.first_seen_at) if to_ist is defined else tender.first_seen_at) or 'N/A' }}</div>
+
+          <div class="kv-label">Last checked on portal</div>
+          <div class="kv-val">{{ tender.last_seen_ist or (to_ist(tender.last_seen_at) if to_ist is defined else tender.last_seen_at) or 'N/A' }}</div>
+
+          <div class="kv-label">Last refresh</div>
+          <div class="kv-val">{{ health.last_run_ist if (health and health.last_run_ist) else 'N/A' }}</div>
+        </div>
+
+        <div style="margin-top: 10px; font-size: 0.8rem; color: var(--text-muted); font-style: italic;">
+          Not verified live. Confirm on the portal before bidding.
+        </div>
+
+        <div style="margin-top: 14px; border-top: 1px solid var(--border-subtle); padding-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">
+            {% if tender.link %}
+              <a href="{{ tender.link }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+                Open bid document ↗
+              </a>
+            {% else %}
+              <span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 500;">No link stored</span>
+            {% endif %}
+
+            {% if (tender.source or '')|lower == 'gem' %}
+              <a href="https://bidplus.gem.gov.in/all-bids" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
+                Open GeM bid list ↗
+              </a>
+            {% elif (tender.source or '')|lower == 'cppp' %}
+              <a href="https://eprocure.gov.in/cppp/latestactivetendersnew/cpppdata" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
+                Open CPPP latest tenders ↗
+              </a>
+            {% elif 'hmel' in (tender.source or '')|lower %}
+              <a href="https://hmeleprocurement.mjunction.in/epspropartner/hmel/login-screen" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
+                Open HMEL portal ↗
+              </a>
+            {% endif %}
+          </div>
+
+          {% if (tender.source or '')|lower in ['gem', 'cppp'] %}
+            <div style="font-size: 0.8rem; color: var(--text-muted);">
+              Paste the bid number to find it
+            </div>
+          {% elif 'hmel' in (tender.source or '')|lower %}
+            <div style="font-size: 0.8rem; color: var(--text-muted);">
+              Requires Swamina's HMEL login
+            </div>
+          {% endif %}
+        </div>
       </div>
 
       <!-- Vertical Timeline: Deadline History -->
@@ -379,7 +517,7 @@
             <div class="timeline-date">
               {% if tender.original_end_ist %}
                 {{ tender.original_end_ist }}
-              {% elif tender.source == 'cppp' %}
+              {% elif tender.source == 'cppp' or 'hmel' in (tender.source or '')|lower %}
                 <span style="color: var(--text-muted);">See portal</span>
               {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
                 <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
@@ -403,12 +541,12 @@
             {% endfor %}
           {% endif %}
 
-          <!-- 2. Live Deadline -->
+          <!-- 2. Recorded Deadline -->
           <div class="timeline-node">
             <div class="timeline-dot active"></div>
             <div class="timeline-date">{{ tender.closing_ist }}</div>
             <div class="timeline-desc">
-              Live deadline
+              Current recorded deadline
               {% if tender.date_check == 'extended_by_corrigendum' %}
                 (extended by Corrigendum)
               {% elif tender.date_check == 'extended_auto' %}
@@ -428,7 +566,7 @@
               <div class="timeline-dot limit"></div>
               <div class="timeline-date">{{ tender.auto_extension_limit_ist }}</div>
               <div class="timeline-desc">
-                Auto limit: extensions beyond this are not trusted{% if tender.auto_extension_limit_utc %} ({{ tender.auto_extension_limit_utc }}){% endif %}
+                Automatic extension limit. Buyers can extend further by corrigendum.{% if tender.corrigendum_date %} (Corrigendum: {{ tender.corrigendum_date }}){% endif %}{% if tender.auto_extension_limit_utc %} [Auto limit UTC: {{ tender.auto_extension_limit_utc }}]{% endif %}
               </div>
             </div>
           {% endif %}
@@ -560,7 +698,7 @@
                   {% endfor %}
                 </div>
               {% endif %}
-            {% elif tender.source == 'cppp' %}
+            {% elif tender.source == 'cppp' or 'hmel' in (tender.source or '')|lower %}
               <span style="color: var(--text-muted);">See portal</span>
             {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
               <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
@@ -575,7 +713,7 @@
           <div class="kv-val">
             {% if tender.total_quantity %}
               {{ tender.total_quantity }}
-            {% elif tender.source == 'cppp' %}
+            {% elif tender.source == 'cppp' or 'hmel' in (tender.source or '')|lower %}
               <span style="color: var(--text-muted);">See portal</span>
             {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
               <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
@@ -590,11 +728,11 @@
           <div class="kv-val">
             {% if tender.emd_amount_inr %}
               ₹{{ "{:,.0f}".format(tender.emd_amount_inr) }}
+            {% elif tender.emd_amount_inr_min and tender.emd_amount_inr_max and tender.emd_amount_inr_min == tender.emd_amount_inr_max %}
+              ₹{{ "{:,.0f}".format(tender.emd_amount_inr_min) }} per schedule
             {% elif tender.emd_amount_inr_min or tender.emd_amount_inr_max %}
               ₹{{ "{:,.0f}".format(tender.emd_amount_inr_min or 0) }} - ₹{{ "{:,.0f}".format(tender.emd_amount_inr_max or 0) }}
-            {% elif tender.emd_value %}
-              {{ tender.emd_value }}
-            {% elif tender.source == 'cppp' %}
+            {% elif tender.source == 'cppp' or 'hmel' in (tender.source or '')|lower %}
               <span style="color: var(--text-muted);">See portal</span>
             {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
               <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
@@ -604,7 +742,7 @@
               Nil / Exempt
             {% endif %}
             {% if tender.buyer_overrides_gem_fields %}
-              <span class="badge" style="background: #fee2e2; color: #991b1b; font-size: 0.7rem; margin-left: 4px;">Buyer documents override GeM values</span>
+              <span class="badge" style="background: #fee2e2; color: #991b1b; font-size: 0.7rem; margin-left: 4px;">EMD/turnover in buyer documents</span>
             {% endif %}
             {% if tender.emd_schedules %}
               <div style="margin-top: 4px; font-size: 0.75rem; color: var(--text-muted);">
@@ -628,7 +766,7 @@
                   {% endfor %}
                 </div>
               {% endif %}
-            {% elif tender.source == 'cppp' %}
+            {% elif tender.source == 'cppp' or 'hmel' in (tender.source or '')|lower %}
               <span style="color: var(--text-muted);">See portal</span>
             {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
               <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
@@ -643,7 +781,7 @@
           <div class="kv-val">
             {% if tender.mse_reserved %}
               Yes
-            {% elif tender.source == 'cppp' %}
+            {% elif tender.source == 'cppp' or 'hmel' in (tender.source or '')|lower %}
               <span style="color: var(--text-muted);">See portal</span>
             {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
               <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
@@ -658,7 +796,7 @@
           <div class="kv-val">
             {% if tender.mii_class_restriction and tender.mii_class_restriction not in ['None', 'not_stated', ''] %}
               {{ tender.mii_class_restriction }}
-            {% elif tender.source == 'cppp' %}
+            {% elif tender.source == 'cppp' or 'hmel' in (tender.source or '')|lower %}
               <span style="color: var(--text-muted);">See portal</span>
             {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
               <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
@@ -675,7 +813,7 @@
               Yes
             {% elif tender.bis_required == 0 or tender.bis_required is sameas false %}
               No
-            {% elif tender.source == 'cppp' %}
+            {% elif tender.source == 'cppp' or 'hmel' in (tender.source or '')|lower %}
               <span style="color: var(--text-muted);">See portal</span>
             {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
               <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
@@ -690,7 +828,7 @@
           <div class="kv-val">
             {% if tender.min_turnover_lakh %}
               {{ tender.min_turnover_lakh }} Lakhs
-            {% elif tender.source == 'cppp' %}
+            {% elif tender.source == 'cppp' or 'hmel' in (tender.source or '')|lower %}
               <span style="color: var(--text-muted);">See portal</span>
             {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
               <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
@@ -705,7 +843,7 @@
           <div class="kv-val">
             {% if tender.years_experience_required %}
               {{ tender.years_experience_required }} Years
-            {% elif tender.source == 'cppp' %}
+            {% elif tender.source == 'cppp' or 'hmel' in (tender.source or '')|lower %}
               <span style="color: var(--text-muted);">See portal</span>
             {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
               <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
@@ -729,7 +867,7 @@
           <div class="kv-val">
             {% if tender.consignee_city and tender.consignee_city not in ['Not Stated', 'not_stated', ''] %}
               {{ tender.consignee_city }}
-            {% elif tender.source == 'cppp' %}
+            {% elif tender.source == 'cppp' or 'hmel' in (tender.source or '')|lower %}
               <span style="color: var(--text-muted);">See portal</span>
             {% elif tender.source == 'gem' and (not tender.pdf_parse_status or tender.pdf_parse_status in ['none', '']) %}
               <span style="color: var(--text-muted);">Not extracted yet, check portal</span>
@@ -824,5 +962,38 @@
     </div>
   </div>
 </div>
+
+<script>
+  window.copyBidNumber = function(text, btn) {
+    if (!text) return;
+    function showCopied() {
+      var orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(function() { btn.textContent = orig; }, 1800);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(showCopied).catch(function() {
+        fallbackCopy(text, btn);
+      });
+    } else {
+      fallbackCopy(text, btn);
+    }
+  };
+  function fallbackCopy(text, btn) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      var orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(function() { btn.textContent = orig; }, 1800);
+    } catch(e) {}
+    document.body.removeChild(ta);
+  }
+</script>
 {% endblock %}
 

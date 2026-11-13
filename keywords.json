@@ -252,6 +252,23 @@
     "printing",
     "guest house"
   ],
+  "lane_exclude": [
+    "stationery",
+    "printing",
+    "furniture",
+    "office accessories",
+    "banner",
+    "sticker",
+    "acp board",
+    "display screen",
+    "conference",
+    "vehicle",
+    "uniform",
+    "canteen",
+    "catering",
+    "air conditioner",
+    "water purifier"
+  ],
   "oil_gas_buyers": [
     "IOCL",
     "Indian Oil",

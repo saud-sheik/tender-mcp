@@ -40,6 +40,7 @@ from tender_mcp.config import (
     get_digest_first_window_hours,
 )
 from tender_mcp.dates import to_ist_display, get_hours_to_close
+from tender_mcp.matcher import is_single_tender
 
 logger = logging.getLogger(__name__)
 
@@ -140,9 +141,11 @@ def format_tender_line(t: dict[str, Any], extra: str = "") -> str:
     htc_str = f"{round(htc, 1)}h left" if htc is not None else "N/A"
     ist_time = to_ist_display(t.get("closing_date", ""))
 
-    emd_str = t.get("emd_value") or ""
+    emd_str = ""
     if t.get("emd_amount_inr"):
         emd_str = f"₹{t['emd_amount_inr']:,.0f}"
+    elif t.get("emd_amount_inr_min") and t.get("emd_amount_inr_max") and t.get("emd_amount_inr_min") == t.get("emd_amount_inr_max"):
+        emd_str = f"₹{t['emd_amount_inr_min']:,.0f} per schedule"
     elif t.get("emd_amount_inr_min") or t.get("emd_amount_inr_max"):
         emd_str = f"₹{t.get('emd_amount_inr_min', 0):,.0f} - ₹{t.get('emd_amount_inr_max', 0):,.0f}"
     if not emd_str:
@@ -154,10 +157,14 @@ def format_tender_line(t: dict[str, Any], extra: str = "") -> str:
     org = t.get("organisation", "N/A")
 
     labels = []
+    if is_single_tender(t) or t.get("single_tender"):
+        labels.append("Single tender")
     if t.get("match_basis") == "location_only":
         labels.append("location only")
     if t.get("buyer_match"):
         labels.append("Oil/gas buyer, supply tender")
+    if t.get("buyer_overrides_gem_fields"):
+        labels.append("EMD/turnover in buyer documents")
     label_str = f" [{', '.join(labels)}]" if labels else ""
 
     return (

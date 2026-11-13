@@ -1,0 +1,474 @@
+{% extends "base.html" %}
+
+{% block title %}Portal Settings & Credentials - Swamina Tender Aggregator{% endblock %}
+
+{% block extra_head %}
+<style>
+  .settings-container {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .settings-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .settings-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .alert-banner {
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 0.88rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .alert-success {
+    background: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+  }
+  [data-theme="dark"] .alert-success {
+    background: #064e3b;
+    color: #a7f3d0;
+    border-color: #059669;
+  }
+  .alert-error, .alert-danger {
+    background: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+  }
+  [data-theme="dark"] .alert-error, [data-theme="dark"] .alert-danger {
+    background: #450a0a;
+    color: #fca5a5;
+    border-color: #991b1b;
+  }
+  .alert-info {
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+  }
+  [data-theme="dark"] .alert-info {
+    background: #172554;
+    color: #93c5fd;
+    border-color: #1e40af;
+  }
+
+  /* Grid Layout */
+  .portals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 20px;
+  }
+  .settings-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .settings-card-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .portal-desc {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+  }
+  .kv-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 0.84rem;
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 12px;
+  }
+  .kv-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+  }
+  .kv-row-label {
+    color: var(--text-muted);
+  }
+  .kv-row-val {
+    font-weight: 600;
+    color: var(--text);
+    text-align: right;
+  }
+
+  /* Forms */
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .form-group label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .form-control {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 12px;
+    font-size: 0.88rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--card-bg);
+    color: var(--text);
+  }
+  .form-control:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+  .form-hint {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="settings-container">
+
+  <!-- Header -->
+  <div class="settings-header">
+    <div>
+      <h1 class="settings-title">⚙️ Portal Settings &amp; Operations</h1>
+      <p class="settings-subtitle">Manage portal authentication, scrapers, background automation, and instant alerts</p>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <form method="post" action="/settings/refresh-all" style="margin: 0;">
+        <button type="submit" class="btn" style="background: #10b981; border-color: #059669; color: #ffffff;" title="Trigger immediate refresh across GeM, CPPP, and HMEL">
+          ⚡ Run Full Refresh (All Portals)
+        </button>
+      </form>
+      <a href="/" class="btn btn-secondary">← Back to Dashboard</a>
+    </div>
+  </div>
+
+  <!-- Flash Message Banner -->
+  {% if message %}
+    <div class="alert-banner alert-{{ msg_type or 'info' }}">
+      {% if msg_type == 'success' %}✓{% elif msg_type == 'error' %}⚠️{% else %}ℹ️{% endif %}
+      <span>{{ message }}</span>
+    </div>
+  {% endif %}
+
+  <!-- Portals Overview Grid -->
+  <div class="portals-grid">
+
+    <!-- GeM Portal Card -->
+    <div class="settings-card">
+      <div class="settings-card-title">
+        <span>🏛️ GeM Portal</span>
+        <span class="badge" style="background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa;">Public</span>
+      </div>
+      <div class="portal-desc">
+        Government e-Marketplace public tender repository. Scrapes without authentication and downloads bid documents automatically.
+      </div>
+      <div class="kv-list">
+        <div class="kv-row">
+          <span class="kv-row-label">Portal Domain</span>
+          <span class="kv-row-val"><code>bidplus.gem.gov.in</code></span>
+        </div>
+        <div class="kv-row">
+          <span class="kv-row-label">Access Mode</span>
+          <span class="kv-row-val" style="color: var(--success);">Public listing (no login required)</span>
+        </div>
+        <div class="kv-row">
+          <span class="kv-row-label">Stored Tenders</span>
+          <span class="kv-row-val">{{ counts.gem }} tenders</span>
+        </div>
+      </div>
+      <div style="margin-top: auto; padding-top: 10px;">
+        <a href="https://bidplus.gem.gov.in/all-bids" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="width: 100%;">
+          Open GeM Portal ↗
+        </a>
+      </div>
+    </div>
+
+    <!-- CPPP Portal Card -->
+    <div class="settings-card">
+      <div class="settings-card-title">
+        <span>🏛️ CPPP Portal</span>
+        <span class="badge" style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd;">Public</span>
+      </div>
+      <div class="portal-desc">
+        Central Public Procurement Portal for Central Ministries and PSUs. Open listing scraped via HTTP without credentials.
+      </div>
+      <div class="kv-list">
+        <div class="kv-row">
+          <span class="kv-row-label">Portal Domain</span>
+          <span class="kv-row-val"><code>eprocure.gov.in</code></span>
+        </div>
+        <div class="kv-row">
+          <span class="kv-row-label">Access Mode</span>
+          <span class="kv-row-val" style="color: var(--success);">Public listing (no login required)</span>
+        </div>
+        <div class="kv-row">
+          <span class="kv-row-label">Stored Tenders</span>
+          <span class="kv-row-val">{{ counts.cppp }} tenders</span>
+        </div>
+      </div>
+      <div style="margin-top: auto; padding-top: 10px;">
+        <a href="https://eprocure.gov.in/cppp/latestactivetendersnew/cpppdata" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="width: 100%;">
+          Open CPPP Portal ↗
+        </a>
+      </div>
+    </div>
+
+    <!-- HMEL Portal Card -->
+    <div class="settings-card" style="border: 2px solid {% if hmel.is_locked %}#ef4444{% elif hmel.configured %}var(--primary){% else %}var(--warning){% endif %};">
+      <div class="settings-card-title">
+        <span>🏭 HMEL Portal</span>
+        <span class="badge" style="background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff;">Vendor Login</span>
+      </div>
+      <div class="portal-desc">
+        HPCL-Mittal Energy Limited e-procurement on mjunction. <strong>Requires active vendor credentials</strong> to access live open tenders.
+      </div>
+      <div class="kv-list">
+        <div class="kv-row">
+          <span class="kv-row-label">Portal Domain</span>
+          <span class="kv-row-val"><code>hmeleprocurement.mjunction.in</code></span>
+        </div>
+        <div class="kv-row">
+          <span class="kv-row-label">Credentials</span>
+          <span class="kv-row-val">
+            {% if hmel.configured %}
+              <span style="color: var(--success);">✓ Configured ({{ hmel.username_masked }})</span>
+            {% else %}
+              <span style="color: var(--warning);">⚠️ Not configured</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="kv-row">
+          <span class="kv-row-label">Lockout Protection</span>
+          <span class="kv-row-val">
+            {% if hmel.is_locked %}
+              <span style="color: var(--danger); font-weight: 700;">🔒 LOCKED</span>
+            {% else %}
+              <span style="color: var(--success);">Normal</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="kv-row">
+          <span class="kv-row-label">Saved Browser Session</span>
+          <span class="kv-row-val">{{ 'Active (reusing)' if hmel.has_session else 'None (fresh login)' }}</span>
+        </div>
+        <div class="kv-row">
+          <span class="kv-row-label">Stored Tenders</span>
+          <span class="kv-row-val"><strong>{{ counts.hmel }} tenders</strong></span>
+        </div>
+      </div>
+      <div style="margin-top: auto; padding-top: 10px;">
+        <a href="https://hmeleprocurement.mjunction.in/epspropartner/hmel/login-screen" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="width: 100%;">
+          Open HMEL Login Page ↗
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- HMEL Credentials & Scraper Management -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
+
+    <!-- Card 1: Manage HMEL Credentials -->
+    <div class="settings-card">
+      <div class="settings-card-title">
+        <span>🔐 HMEL mjunction Login Credentials</span>
+      </div>
+      <p class="portal-desc">
+        Enter your Swamina International vendor account credentials for <code>hmeleprocurement.mjunction.in</code>. These are stored locally in your <code>.env</code> file and used by the Playwright scraper to authenticate.
+      </p>
+
+      {% if hmel.is_locked %}
+        <div class="alert-banner alert-error" style="display: flex; flex-direction: column; align-items: flex-start; gap: 8px;">
+          <div><strong>⚠️ Account Lockout Protection Active</strong></div>
+          <div style="font-size: 0.8rem;">{{ hmel.lock_reason }}</div>
+          <form method="post" action="/settings/hmel/unlock" style="margin-top: 4px;">
+            <button type="submit" class="btn btn-secondary" style="font-size: 0.8rem; padding: 4px 10px;">
+              🔓 Clear Lockout Protection
+            </button>
+          </form>
+        </div>
+      {% endif %}
+
+      <form method="post" action="/settings/hmel" style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="form-group">
+          <label for="username">HMEL Username / Vendor ID</label>
+          <input type="text" id="username" name="username" class="form-control"
+                 placeholder="e.g. your_username"
+                 value="{% if hmel.configured %}{{ hmel.raw_username }}{% endif %}" required autocomplete="off">
+          <div class="form-hint">Your registered vendor login ID on the mjunction HMEL portal.</div>
+        </div>
+
+        <div class="form-group">
+          <label for="password">HMEL Password</label>
+          <input type="password" id="password" name="password" class="form-control"
+                 placeholder="{% if hmel.configured %}•••••••••••• (leave blank to keep current){% else %}Enter vendor password{% endif %}"
+                 {% if not hmel.configured %}required{% endif %} autocomplete="new-password">
+          <div class="form-hint">Stored strictly in local .env; never shown in plaintext or shared externally.</div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px;">
+          <button type="submit" class="btn">
+            💾 Save HMEL Credentials
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Card 2: Scrape & Test Actions -->
+    <div class="settings-card">
+      <div class="settings-card-title">
+        <span>🚀 Live Scraper &amp; Ingestion Actions</span>
+      </div>
+      <p class="portal-desc">
+        Trigger automated scraping for <code>hmeleprocurement.mjunction.in</code>. Playwright will launch in headless mode, log in with your credentials, extract live tenders, and update <code>tenders.db</code>.
+      </p>
+
+      <div style="background: var(--card-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-weight: 600; font-size: 0.85rem; color: var(--text);">Action: Test Login &amp; Scrape Tenders</div>
+        <div style="font-size: 0.8rem; color: var(--text-muted);">
+          Connects directly to the portal, verifies credentials, and ingests all current live bids into your dashboard.
+        </div>
+        <form method="post" action="/settings/hmel/refresh">
+          <button type="submit" class="btn" style="width: 100%;" {% if hmel.is_locked or not hmel.configured %}disabled title="Configure credentials and clear lockout first"{% endif %}>
+            ▶ Fetch HMEL Tenders Now
+          </button>
+        </form>
+        {% if not hmel.configured %}
+          <div style="font-size: 0.75rem; color: var(--warning);">⚠️ Configure credentials first to enable scraping.</div>
+        {% elif hmel.is_locked %}
+          <div style="font-size: 0.75rem; color: var(--danger);">⚠️ Account is currently locked out to prevent suspension. Clear lockout above to retry.</div>
+        {% endif %}
+      </div>
+
+      <div style="border-top: 1px solid var(--border-subtle); padding-top: 14px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-weight: 600; font-size: 0.85rem; color: var(--text);">Session Management</div>
+        <div style="font-size: 0.8rem; color: var(--text-muted);">
+          Status: <strong>{{ 'Session cookies stored in playwright_state.json' if hmel.has_session else 'No active session saved' }}</strong>
+        </div>
+        {% if hmel.has_session %}
+          <form method="post" action="/settings/hmel/clear-session">
+            <button type="submit" class="btn btn-secondary" style="font-size: 0.8rem;">
+              🔄 Clear Saved Session (Force Fresh Login)
+            </button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Operations & Integrations Section -->
+  <div class="section-title" style="margin-top: 10px;">
+    <span>⚡ Background Auto-Refresh &amp; Instant Alerts</span>
+  </div>
+
+  <div class="portals-grid">
+    <!-- Card: Auto-Refresh Scheduler -->
+    <div class="settings-card">
+      <div class="settings-card-title">
+        <span>⏱️ Auto-Refresh Scheduler</span>
+        <span class="badge" style="background: {% if scheduler.is_active %}#ecfdf5; color: #065f46; border: 1px solid #a7f3d0{% else %}var(--card-subtle); color: var(--text-muted); border: 1px solid var(--border){% endif %};">
+          {{ 'Active' if scheduler.is_active else 'Disabled' }}
+        </span>
+      </div>
+      <p class="portal-desc">
+        Runs an internal background loop inside the aggregator process to automatically pull new bids across GeM, CPPP, and HMEL at regular intervals without needing external cron jobs.
+      </p>
+      <div class="kv-list">
+        <div class="kv-row">
+          <span class="kv-row-label">Current Status</span>
+          <span class="kv-row-val">
+            {% if scheduler.is_active %}
+              <strong style="color: var(--success);">Running every {{ scheduler.interval_minutes }} minutes</strong> ({{ (scheduler.interval_minutes / 60)|round(1) }}h)
+            {% else %}
+              <span style="color: var(--text-muted);">Disabled (Manual trigger only)</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="kv-row">
+          <span class="kv-row-label">Last Refresh</span>
+          <span class="kv-row-val">{{ health.last_run_ist if (health and health.last_run_ist) else 'N/A' }}</span>
+        </div>
+      </div>
+
+      <form method="post" action="/settings/scheduler" style="margin-top: auto; display: flex; flex-direction: column; gap: 10px;">
+        <label for="interval_minutes" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">
+          Change Auto-Refresh Interval
+        </label>
+        <select id="interval_minutes" name="interval_minutes" class="form-control">
+          <option value="0" {% if scheduler.interval_minutes == 0 %}selected{% endif %}>Disabled (Manual only)</option>
+          <option value="60" {% if scheduler.interval_minutes == 60 %}selected{% endif %}>Every 1 hour (60 min)</option>
+          <option value="180" {% if scheduler.interval_minutes == 180 %}selected{% endif %}>Every 3 hours (180 min) - Recommended</option>
+          <option value="360" {% if scheduler.interval_minutes == 360 %}selected{% endif %}>Every 6 hours (360 min)</option>
+          <option value="720" {% if scheduler.interval_minutes == 720 %}selected{% endif %}>Every 12 hours (720 min)</option>
+        </select>
+        <button type="submit" class="btn btn-secondary" style="width: 100%;">
+          💾 Save Scheduler Interval
+        </button>
+      </form>
+    </div>
+
+    <!-- Card: Slack Instant Alerts -->
+    <div class="settings-card">
+      <div class="settings-card-title">
+        <span>💬 Instant Slack Webhook Alerts</span>
+        <span class="badge" style="background: {% if slack.configured %}#ecfdf5; color: #065f46; border: 1px solid #a7f3d0{% else %}var(--card-subtle); color: var(--text-muted); border: 1px solid var(--border){% endif %};">
+          {{ 'Configured' if slack.configured else 'Not Configured' }}
+        </span>
+      </div>
+      <p class="portal-desc">
+        Instant notification triggers to your team's Slack channel whenever new <strong>Tier A / high-relevance tenders</strong> or oil &amp; gas buyer bids are discovered during a refresh.
+      </p>
+
+      <form method="post" action="/settings/slack" style="display: flex; flex-direction: column; gap: 12px; margin-top: auto;">
+        <div class="form-group">
+          <label for="webhook_url">Slack Incoming Webhook URL</label>
+          <input type="text" id="webhook_url" name="webhook_url" class="form-control"
+                 placeholder="https://hooks.slack.com/services/..."
+                 value="{{ slack.raw_url }}" autocomplete="off">
+          <div class="form-hint">Stored strictly in local .env; never exposed externally.</div>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <button type="submit" class="btn" style="flex: 1;">
+            💾 Save Webhook URL
+          </button>
+          <button type="submit" name="test_alert" value="1" class="btn btn-secondary" {% if not slack.configured %}title="Save a webhook URL first"{% endif %}>
+            🔔 Send Test Alert
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+

@@ -128,6 +128,12 @@ def main() -> int:
     for err in errors:
         logger.error("Source error: %s", err)
 
+    from scripts.check_consistency import check_consistency
+    is_consistent, violations = check_consistency()
+    if not is_consistent:
+        logger.error("Consistency check failed: %s", {k: len(v) for k, v in violations.items()})
+        return 1
+
     return 0 if not errors else 1
 
 

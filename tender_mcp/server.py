@@ -234,6 +234,9 @@ def search_tenders(
         if r.get("buyer_match"):
             r["buyer_match_label"] = "Oil/gas buyer, supply tender"
 
+        for c in ("emd_value", "tender_value", "possible_latest_end_utc"):
+            r.pop(c, None)
+
         filtered.append(r)
 
     # Sort: tier A by closing_date asc within bid_window, then by score desc
@@ -296,6 +299,8 @@ def get_tender(tender_id: str) -> str:
             tender["flags"].append("EMD / turnover set in buyer documents, check them before relying on these numbers")
     if tender.get("buyer_match"):
         tender["buyer_match_label"] = "Oil/gas buyer, supply tender"
+    for c in ("emd_value", "tender_value", "possible_latest_end_utc"):
+        tender.pop(c, None)
     return json.dumps(tender, indent=2, default=str)
 
 
@@ -395,7 +400,7 @@ def export_tenders(
         "published_date", "closing_date", "opening_date",
         "original_end_utc", "auto_extension_limit_utc", "is_extended", "was_extended", "extension_days_observed", "date_check", "extensions_seen",
         "hours_to_close", "bid_window", "closing_soon",
-        "emd_value", "tender_value", "link", "status",
+        "link", "status",
         "relevance_score", "matched_terms",
         # GeM enrichment fields
         "bid_number", "estimated_bid_value_inr", "floor_price_inr_min", "floor_price_inr_max", "floor_price_schedules", "pbg_months_per_lot", "buyer_overrides_gem_fields", "total_quantity",
@@ -548,6 +553,131 @@ def get_details_needed_tenders(limit: int = 50) -> str:
             (limit,),
         ).fetchall()
         return json.dumps([dict(r) for r in rows], indent=2, default=str)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Tool: configure_and_fetch_hmel
+# ═══════════════════════════════════════════════════════════════════════════
+
+@mcp.tool()
+async def configure_and_fetch_hmel(
+    username: str | None = None,
+    password: str | None = None,
+) -> str:
+    """
+    Configure HMEL (hmeleprocurement.mjunction.in) vendor credentials and immediately pull live tenders.
+    If username/password are omitted, uses currently saved credentials from .env.
+    
+    Args:
+        username: HMEL mjunction vendor username (optional if already configured)
+        password: HMEL mjunction vendor password (optional if already configured)
+        
+    Returns:
+        JSON summary of scraped tenders (retrieved count, new, updated, status).
+    """
+    from tender_mcp.config import set_hmel_credentials, get_hmel_credentials, is_hmel_locked
+    from tender_mcp.refresh import _run_hmel
+    from tender_mcp.db import upsert_tender
+
+    if username and password:
+        set_hmel_credentials(username, password)
+
+    u, p = get_hmel_credentials()
+    if not u or not p:
+        return json.dumps({
+            "status": "error",
+            "message": "HMEL credentials are not configured. Please supply username and password."
+        })
+
+    is_locked, reason = is_hmel_locked()
+    if is_locked:
+        return json.dumps({
+            "status": "locked",
+            "message": f"HMEL account is protected by lockout: {reason}. Call with unlock first."
+        })
+
+    tenders, err = await _run_hmel()
+    if err:
+        return json.dumps({
+            "status": "error",
+            "message": f"HMEL scrape failed: {err}"
+        })
+
+    new_count = 0
+    updated_count = 0
+    for t in tenders:
+        _, is_new = upsert_tender(t)
+        if is_new:
+            new_count += 1
+        else:
+            updated_count += 1
+
+    return json.dumps({
+        "status": "success",
+        "portal": "hmeleprocurement.mjunction.in",
+        "retrieved_count": len(tenders),
+        "new_count": new_count,
+        "updated_count": updated_count,
+        "sample": tenders[:5],
+    }, indent=2, default=str)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Tool: toggle_watchlist
+# ═══════════════════════════════════════════════════════════════════════════
+
+@mcp.tool()
+def toggle_watchlist(tender_id: str) -> str:
+    """
+    Star or unstar a tender in your personal watchlist.
+
+    Args:
+        tender_id: Unique tender identifier (e.g. 'gem:GEM/2026/B/12345' or 'hmel:54321').
+
+    Returns:
+        JSON response with the updated watched status.
+    """
+    from tender_mcp.db import toggle_tender_watched
+
+    try:
+        new_state = toggle_tender_watched(tender_id)
+        return json.dumps({
+            "status": "success",
+            "tender_id": tender_id,
+            "is_watched": new_state,
+            "message": f"Tender is now {'starred/watched' if new_state else 'removed from watchlist'}."
+        }, indent=2)
+    except KeyError:
+        return json.dumps({
+            "status": "error",
+            "message": f"Tender '{tender_id}' not found."
+        }, indent=2)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Tool: get_watchlist
+# ═══════════════════════════════════════════════════════════════════════════
+
+@mcp.tool()
+def get_watchlist(limit: int = 50) -> str:
+    """
+    Retrieve all tenders currently saved / starred in your watchlist.
+
+    Args:
+        limit: Max tenders to return (default 50).
+
+    Returns:
+        JSON list of watched tenders sorted by closing date.
+    """
+    from tender_mcp.db import get_watched_tenders
+
+    rows = get_watched_tenders(limit=limit)
+    return json.dumps({
+        "status": "success",
+        "count": len(rows),
+        "tenders": rows,
+    }, indent=2, default=str)
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════
